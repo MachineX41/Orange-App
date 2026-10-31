@@ -46,6 +46,8 @@ final class AppRuntime {
     var ocrMode: String { didSet { save() } }
     var settingsTab: SettingsTab = .general
     let ocrWorkspace = OCRWorkspaceModel()
+    var showShortcuts = false
+    var showOnboarding = !(UserDefaults.standard.bool(forKey: "onboardingDone") && Consent.accepted)
     var customOutputPath: String? {
         didSet {
             OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
