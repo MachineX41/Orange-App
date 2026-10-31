@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import OrangeKit
 
 /// Executes the OCR queue owned by `AppRuntime.ocrWorkspace`. Options are
 /// snapshotted at start; page results stream into the model at most 10Hz
@@ -18,28 +20,35 @@ final class OCRRunner {
 
     func run() {
         guard !model.isRunning, !model.sources.isEmpty else { return }
-        let options = snapshotOptions()
-        let jobID = UUID()
-        model.beginRun(options: options, jobID: jobID)
+        let options = model.options
         let sources = model.sources
-        let runID = model.runID
-        // Bridge the cancellable job handle back into the model.
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            _ = runtime.run(
-                "OCR", symbol: "text.viewfinder",
-                detail: optionsLabel(options),
-                successMessage: "OCR complete",
-                cancellable: true
-            ) { progress in
+        let runID = model.runID + 1
+        let task = runtime.run(
+            "OCR", symbol: "text.viewfinder",
+            detail: optionsLabel(options),
+            successMessage: "OCR complete",
+            cancellable: true
+        ) { [weak self] progress in
+            guard let self else { return [] }
+            do {
                 try await self.execute(runID: runID, options: options, sources: sources, progress: progress)
-                return []
+            } catch is CancellationError {
+                await MainActor.run { [weak self] in self?.model.cancelRun() }
+                throw CancellationError()
+            } catch let error as OrangeError where error == .cancelled {
+                await MainActor.run { [weak self] in self?.model.cancelRun() }
+                throw error
+            } catch {
+                await MainActor.run { [weak self] in self?.model.failRun((error as? OrangeError)?.message ?? error.localizedDescription) }
+                throw error
             }
+            return []
         }
+        model.beginRun(options: options, task: task, runID: runID)
     }
 
     func cancel() {
-        if let id = model.jobID { runtime.cancelJob(id) }
+        model.task?.cancel()
         model.cancelRun()
     }
 

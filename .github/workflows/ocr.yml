@@ -1,0 +1,65 @@
+name: ocr
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: read
+  pull-requests: read
+
+jobs:
+  ocr-unit-tests:
+    name: ocr-unit-tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (no model downloads)
+        run: swift test --xunit-output build/ocr-unit.xml
+      - name: Upload unit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-unit-xml
+          path: build/ocr-unit.xml
+
+  ocr-bundle-smoke:
+    name: ocr-bundle-smoke
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native runtime
+        run: ./scripts/build-ocr-runtime.sh
+      - name: Build app bundle
+        run: ./scripts/build-app.sh
+      - name: Helper capabilities
+        run: build/Orange.app/Contents/Helpers/OrangeOCRHelper --capabilities
+      - name: Codesign check
+        run: codesign --verify --deep --strict build/Orange.app
+      - name: No dev-machine dylibs
+        run: otool -L build/Orange.app/Contents/Helpers/OrangeOCRHelper
+
+  ocr-required-model-validation:
+    name: ocr-required-model-validation
+    runs-on: macos-26
+    if: always()
+    needs: [ocr-unit-tests, ocr-bundle-smoke]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require hardware validation status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            SHA="${{ github.sha }}"
+          fi
+          echo "Checking ocr-hardware-validation for $SHA"
+          STATE="$(gh api "repos/${{ github.repository }}/commits/$SHA/status" --jq '.statuses | map(select(.context=="ocr-hardware-validation")) | .[0].state // "missing"')"
+          echo "status state: $STATE"
+          if [[ "$STATE" != "success" ]]; then
+            echo "::error::ocr-hardware-validation is '$STATE' for $SHA. Run scripts/validate-ocr-models.sh --publish-pr <n> on hardware first."
+            exit 1
+          fi

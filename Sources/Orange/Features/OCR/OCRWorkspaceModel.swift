@@ -1,5 +1,7 @@
+import CoreGraphics
 import Foundation
 import Observation
+import OrangeKit
 
 /// Persistent OCR session owned by AppRuntime — survives tab switches because
 /// the view layer is recreated on section change but this model is not.
@@ -49,13 +51,13 @@ final class OCRWorkspaceModel {
     var activeComputeLabel: String = "System managed"
     var errorMessage: String?
     var runID = 0
-    var jobID: UUID?
+    var task: Task<[URL], Never>?
 
-    var isRunning: Bool { jobID != nil }
+    var isRunning: Bool { task != nil }
 
-    func beginRun(options: OCROptions, jobID: UUID) {
-        self.runID += 1
-        self.jobID = jobID
+    func beginRun(options: OCROptions, task: Task<[URL], Never>, runID: Int? = nil) {
+        self.runID = runID ?? (self.runID + 1)
+        self.task = task
         self.phase = .preparing
         self.errorMessage = nil
         var snapshot = options
@@ -71,19 +73,19 @@ final class OCRWorkspaceModel {
     }
 
     func finishRun() {
-        jobID = nil
+        task = nil
         if case .failed = phase { return }
         if case .cancelled = phase { return }
         phase = .done
     }
 
     func cancelRun() {
-        jobID = nil
+        task = nil
         phase = .cancelled
     }
 
     func failRun(_ message: String) {
-        jobID = nil
+        task = nil
         phase = .failed(message)
         errorMessage = message
     }

@@ -80,7 +80,6 @@ public actor OCRModelStore {
 
     public func verifyStagedFile(_ url: URL, artifact: OCRModelArtifact) throws {
         try verifyFile(url, expectedBytes: artifact.byteCount, expectedSHA256: artifact.sha256)
-        // GGUF magic check: "GGUF" little-endian.
         guard let handle = try? FileHandle(forReadingFrom: url),
               let prefix = try? handle.read(upToCount: 4)
         else { throw OrangeError.unreadable(artifact.filename) }
