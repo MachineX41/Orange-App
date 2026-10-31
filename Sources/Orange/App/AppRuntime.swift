@@ -394,11 +394,22 @@ final class AppRuntime {
 
     // MARK: Jobs
 
+    /// Handles for cancellable work only; plain media jobs stay fire-and-forget.
+    @ObservationIgnored private var cancellables: [UUID: Task<[URL], Never>] = [:]
+
+    func canCancel(_ id: UUID) -> Bool { cancellables[id] != nil }
+
+    func cancelJob(_ id: UUID) {
+        cancellables[id]?.cancel()
+    }
+
     @discardableResult
     func run(
         _ title: String,
         symbol: String,
         detail: String = "",
+        successMessage: String? = nil,
+        cancellable: Bool = false,
         work: @escaping @Sendable (@escaping ProgressHandler) async throws -> [URL]
     ) -> Task<[URL], Never> {
         let id = UUID()
@@ -409,6 +420,7 @@ final class AppRuntime {
             let clamped = min(max(value, 0), 1)
             Task { @MainActor in
                 let runtime = AppRuntime.shared
+                guard runtime.jobs.contains(where: { $0.id == id && $0.state == .running }) else { return }
                 guard let current = runtime.progress[id] else { return }
                 let delta = abs(clamped - current)
                 // The first bytes, every noticeable step, a new file starting over, and completion.
@@ -416,16 +428,32 @@ final class AppRuntime {
                 runtime.progress[id] = clamped
             }
         }
-        return Task {
+        let worker: Task<[URL], any Error> = Task.detached(priority: .userInitiated) {
+            try await work(report)
+        }
+        let outer: Task<[URL], Never> = Task { @MainActor in
             do {
-                let outputs = try await Task.detached(priority: .userInitiated) { try await work(report) }.value
-                finish(id, outputs: outputs, title: title, symbol: symbol)
+                let outputs = try await withTaskCancellationHandler {
+                    try await worker.value
+                } onCancel: {
+                    worker.cancel()
+                }
+                try Task.checkCancellation()
+                if cancellable { self.cancellables[id] = nil }
+                self.finish(id, outputs: outputs, title: title, symbol: symbol, successMessage: successMessage)
                 return outputs
             } catch {
-                fail(id, error: error, title: title)
+                if cancellable { self.cancellables[id] = nil }
+                if error is CancellationError || (error as? OrangeError) == .cancelled {
+                    self.cancelFinish(id, title: title)
+                } else {
+                    self.fail(id, error: error, title: title)
+                }
                 return []
             }
         }
+        if cancellable { self.cancellables[id] = outer }
+        return outer
     }
 
     func runEach(
@@ -446,6 +474,7 @@ final class AppRuntime {
                 do {
                     outputs += try await work(url) { value in progress((Double(index) + value) / Double(urls.count)) }
                 } catch {
+                    if error is CancellationError || (error as? OrangeError) == .cancelled { throw error }
                     firstError = firstError ?? error
                 }
                 progress(Double(index + 1) / Double(urls.count))
@@ -455,17 +484,34 @@ final class AppRuntime {
         }
     }
 
-    private func finish(_ id: UUID, outputs: [URL], title: String, symbol: String) {
+    private func finish(_ id: UUID, outputs: [URL], title: String, symbol: String, successMessage: String? = nil) {
         progress[id] = nil
+        let detail: String
+        if outputs.count == 1 { detail = outputs[0].lastPathComponent }
+        else if !outputs.isEmpty { detail = L("\(outputs.count) files", "\(outputs.count) dosya") }
+        else { detail = successMessage ?? L("Done", "Tamamlandı") }
         if let index = jobs.firstIndex(where: { $0.id == id }) {
             jobs[index].state = .success
             jobs[index].outputPaths = outputs.map(\.path)
-            jobs[index].detail = outputs.count == 1 ? outputs[0].lastPathComponent : L("\(outputs.count) files", "\(outputs.count) dosya")
+            jobs[index].detail = detail
         }
         persist()
         if soundOnDone { NSSound(named: "Glass")?.play() }
         if revealWhenDone, !outputs.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(outputs) }
-        toast(title, outputs.count == 1 ? outputs[0].lastPathComponent : L("\(outputs.count) files ready", "\(outputs.count) dosya hazır"), symbol: "checkmark.circle.fill", style: .success, outputs: outputs)
+        if !outputs.isEmpty || successMessage != nil {
+            toast(title, detail, symbol: "checkmark.circle.fill", style: .success, outputs: outputs)
+        }
+        ActivityHUD.shared.refresh()
+    }
+
+    private func cancelFinish(_ id: UUID, title: String) {
+        progress[id] = nil
+        if let index = jobs.firstIndex(where: { $0.id == id }) {
+            jobs[index].state = .cancelled
+            jobs[index].detail = L("Cancelled", "İptal edildi")
+        }
+        persist()
+        ActivityHUD.shared.refresh()
     }
 
     private func fail(_ id: UUID, error: Error, title: String) {

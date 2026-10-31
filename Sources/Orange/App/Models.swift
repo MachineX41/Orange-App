@@ -79,7 +79,7 @@ struct WheelSession: Identifiable, Equatable {
 }
 
 enum JobState: String, Codable, Sendable {
-    case running, success, failure
+    case running, success, failure, cancelled
 }
 
 struct JobRecord: Identifiable, Codable, Equatable, Sendable {

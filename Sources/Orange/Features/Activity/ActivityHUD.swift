@@ -100,12 +100,21 @@ struct JobToast: View {
                 Text(job.detail).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Text(progressLabel)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .contentTransition(.numericText())
-                .animation(.easeOut(duration: 0.2), value: progressLabel)
+            if AppRuntime.shared.canCancel(job.id) {
+                Button(L("Cancel", "İptal")) {
+                    AppRuntime.shared.cancelJob(job.id)
+                }
+                .buttonStyle(.glass).tint(nil)
+                .controlSize(.small)
+                .accessibilityLabel(L("Cancel", "İptal"))
+            } else {
+                Text(progressLabel)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.2), value: progressLabel)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
