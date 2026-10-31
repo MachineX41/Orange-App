@@ -7,6 +7,7 @@ struct OCRWorkspace: View {
     @Environment(AppRuntime.self) private var runtime
     @State private var runner: OCRRunner?
     @State private var wide = true
+    @State private var narrowTab = 0
 
     private var model: OCRWorkspaceModel { runtime.ocrWorkspace }
 
@@ -45,69 +46,87 @@ struct OCRWorkspace: View {
     // MARK: - Controls
 
     private var controls: some View {
-        HStack(spacing: 12) {
-            Picker(L("Model", "Model"), selection: Binding(
-                get: { model.options.modelID },
-                set: { setModel($0) }
-            )) {
-                ForEach(availableModels, id: \.id) { entry in
-                    Text(entry.displayName).tag(entry.id)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    SectionLabel(title: L("Model", "Model"), symbol: "cpu")
+                    Picker("", selection: Binding(
+                        get: { model.options.modelID },
+                        set: { setModel($0) }
+                    )) {
+                        ForEach(availableModels, id: \.id) { entry in
+                            Text(entry.displayName).tag(entry.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .disabled(model.isRunning)
+                    .frame(minWidth: 170)
                 }
-            }
-            .pickerStyle(.menu)
-            .disabled(model.isRunning)
-            .frame(maxWidth: 200)
-
-            Picker(L("Language", "Dil"), selection: Binding(
-                get: { languageTag },
-                set: { setLanguage($0) }
-            )) {
-                Text(L("Auto", "Otomatik")).tag("")
-                Text("Türkçe").tag("tr")
-                Text("English").tag("en")
-                Text(L("Turkish + English", "Türkçe + İngilizce")).tag("tr+en")
-            }
-            .pickerStyle(.menu)
-            .disabled(model.isRunning)
-            .frame(maxWidth: 190)
-
-            Picker(L("Mode", "Mod"), selection: Binding(
-                get: { model.options.mode },
-                set: { setMode($0) }
-            )) {
-                ForEach(supportedModes, id: \.self) { mode in
-                    Text(modeLabel(mode)).tag(mode)
+                VStack(alignment: .leading, spacing: 6) {
+                    SectionLabel(title: L("Language", "Dil"), symbol: "globe")
+                    Picker("", selection: Binding(
+                        get: { languageTag },
+                        set: { setLanguage($0) }
+                    )) {
+                        Text(L("Auto", "Otomatik")).tag("")
+                        Text("Türkçe").tag("tr")
+                        Text("English").tag("en")
+                        Text(L("Turkish + English", "Türkçe + İngilizce")).tag("tr+en")
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .disabled(model.isRunning)
+                    .frame(minWidth: 170)
                 }
-            }
-            .pickerStyle(.segmented)
-            .disabled(model.isRunning)
-            .frame(maxWidth: 220)
-
-            Picker(L("Compute", "Hesaplama"), selection: Binding(
-                get: { model.options.compute },
-                set: { setCompute($0) }
-            )) {
-                Text(L("Auto", "Otomatik")).tag(OCRComputePreference.automatic)
-                Text("Metal").tag(OCRComputePreference.metal)
-                Text("CPU").tag(OCRComputePreference.cpu)
-            }
-            .pickerStyle(.segmented)
-            .disabled(model.isRunning || model.options.modelID == .appleVision)
-            .frame(maxWidth: 240)
-            .help(model.options.modelID == .appleVision ? L("OS-managed", "Sistem yönetimli") : "")
-
-            Spacer(minLength: 0)
-
-            if model.isRunning {
-                Button(L("Cancel", "İptal")) { runner?.cancel() }
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityLabel(L("Cancel", "İptal"))
-            } else {
-                Button(L("Run", "Çalıştır")) { runner?.run() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(model.sources.isEmpty)
+                VStack(alignment: .leading, spacing: 6) {
+                    SectionLabel(title: L("Mode", "Mod"), symbol: "doc.richtext")
+                    Picker("", selection: Binding(
+                        get: { model.options.mode },
+                        set: { setMode($0) }
+                    )) {
+                        ForEach(supportedModes, id: \.self) { mode in
+                            Text(modeLabel(mode)).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .disabled(model.isRunning)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    SectionLabel(title: L("Compute", "Hesaplama"), symbol: "bolt")
+                    Picker("", selection: Binding(
+                        get: { model.options.compute },
+                        set: { setCompute($0) }
+                    )) {
+                        Text(L("Auto", "Otomatik")).tag(OCRComputePreference.automatic)
+                        Text("Metal").tag(OCRComputePreference.metal)
+                        Text("CPU").tag(OCRComputePreference.cpu)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .disabled(model.isRunning || model.options.modelID == .appleVision)
+                    .help(model.options.modelID == .appleVision ? L("OS-managed", "Sistem yönetimli") : "")
+                }
+                Spacer(minLength: 0)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(" ")
+                        .font(.system(size: 12.5, weight: .medium))
+                    if model.isRunning {
+                        Button(L("Cancel", "İptal")) { runner?.cancel() }
+                            .keyboardShortcut(.cancelAction)
+                            .accessibilityLabel(L("Cancel", "İptal"))
+                            .controlSize(.large)
+                    } else {
+                        Button(L("Run", "Çalıştır")) { runner?.run() }
+                            .keyboardShortcut(.return, modifiers: .command)
+                            .disabled(model.sources.isEmpty)
+                            .controlSize(.large)
+                    }
+                }
             }
         }
+        .padding(18)
         .glassCard(radius: 20)
     }
 
@@ -168,15 +187,18 @@ struct OCRWorkspace: View {
             } else {
                 VStack(spacing: 16) {
                     rail.frame(maxWidth: .infinity)
-                    TabView(selection: Binding(
-                        get: { model.showMarkdown ? 1 : 0 },
-                        set: { _ in }
-                    )) {
-                        previewPanel.tag(0)
-                        resultPanel.tag(1)
+                    Picker("", selection: $narrowTab) {
+                        Text(L("Preview", "Önizleme")).tag(0)
+                        Text(L("Result", "Sonuç")).tag(1)
                     }
-                    .tabViewStyle(.automatic)
-                    .frame(minHeight: 380)
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 320)
+                    if narrowTab == 0 {
+                        previewPanel
+                    } else {
+                        resultPanel
+                    }
                 }
             }
         }
@@ -186,8 +208,7 @@ struct OCRWorkspace: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(title: L("Sources", "Kaynaklar"), symbol: "photo.stack")
             if model.sources.isEmpty {
-                Text(L("No files yet.", "Henüz dosya yok."))
-                    .font(.callout).foregroundStyle(.secondary)
+                EmptyHint(symbol: "photo.stack", title: L("No files yet", "Henüz dosya yok"), message: L("Add files or drop them here.", "Dosya ekleyin veya buraya bırakın."))
             }
             ForEach(model.sources) { source in
                 HStack {
@@ -206,7 +227,9 @@ struct OCRWorkspace: View {
                 .padding(8)
                 .glassCard(radius: 12)
             }
-            SectionLabel(title: L("Pages", "Sayfalar"), symbol: "doc.richtext")
+            if !model.pages.isEmpty {
+                SectionLabel(title: L("Pages", "Sayfalar"), symbol: "doc.richtext")
+            }
             ForEach(model.pages) { page in
                 Button {
                     model.selectedPageID = page.id
@@ -233,20 +256,14 @@ struct OCRWorkspace: View {
     private var previewPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(title: L("Preview", "Önizleme"), symbol: "eye")
-            ZStack {
-                OrangeBackdrop()
-                if let page = model.selectedPage {
-                    Text(String(page.text.prefix(200)))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .padding()
-                } else {
-                    Text(L("Select a page.", "Sayfa seçin."))
-                        .font(.callout).foregroundStyle(.secondary)
-                }
+            if let page = model.selectedPage {
+                OCRPagePreview(sourceURL: page.sourceURL, pageIndex: page.pageIndex)
+                    .frame(minHeight: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else {
+                EmptyHint(symbol: "eye", title: L("No page selected", "Sayfa seçilmedi"), message: L("Add a file to preview it here.", "Önizlemek için dosya ekleyin."))
+                    .frame(minHeight: 300)
             }
-            .frame(minHeight: 300)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .glassCard(radius: 20)
     }
@@ -295,15 +312,15 @@ struct OCRWorkspace: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 exportRow(page: page)
-            } else {
-                Text(L("Run OCR to see results.", "Sonuç için OCR çalıştırın."))
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            if let error = model.errorMessage {
+            } else if let error = model.errorMessage {
                 Text(error)
                     .font(.callout)
                     .foregroundStyle(OrangeTheme.ember)
                     .textSelection(.enabled)
+                    .padding(8)
+            } else {
+                EmptyHint(symbol: "text.alignleft", title: L("No results yet", "Henüz sonuç yok"), message: L("Run OCR to see recognized text here.", "Tanınan metni görmek için OCR çalıştırın."))
+                    .frame(minHeight: 300)
             }
         }
         .glassCard(radius: 20)
@@ -426,5 +443,36 @@ struct OCRWorkspace: View {
         } catch {
             runtime.notify(error)
         }
+    }
+}
+
+/// Source page preview: real image for image files, first-page render for PDFs.
+struct OCRPagePreview: View {
+    var sourceURL: URL
+    var pageIndex: Int
+    @State private var image: CGImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.quaternary.opacity(0.4))
+            if let image {
+                Image(nsImage: NSImage(cgImage: image, size: .zero))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .task(id: "\(sourceURL.path)#\(pageIndex)") {
+            image = await OCRPagePreview.load(sourceURL: sourceURL, pageIndex: pageIndex)
+        }
+    }
+
+    private static func load(sourceURL: URL, pageIndex: Int) async -> CGImage? {
+        await Task.detached(priority: .userInitiated) {
+            let source = OCRDocumentSource(url: sourceURL)
+            return try? source.renderImage(pageIndex: pageIndex, maxSide: 1600)
+        }.value
     }
 }
