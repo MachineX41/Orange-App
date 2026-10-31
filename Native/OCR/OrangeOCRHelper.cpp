@@ -187,8 +187,10 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     params.cpuparams.n_threads = std::max(1, std::min(threads, 8));
     params.cpuparams_batch.n_threads = params.cpuparams.n_threads;
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-    params.sampling.temp = 0.0;  // greedy
+    params.sampling.temp = 0.0;  // greedy (Xiaomi recipe: temp 0 + top_p 0.8 filter)
     params.sampling.top_k = 1;
+    params.sampling.top_p = 0.8;
+    params.sampling.penalty_repeat = 1.0;
 
     bool wantMetal = (compute == "metal" || compute == "automatic");
     bool cpuOnly = (compute == "cpu") || !wantMetal;
