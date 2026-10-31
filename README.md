@@ -81,7 +81,8 @@ Sürüklerken tuşu değiştirirseniz çark yerinde kalır, yalnızca içeriği 
 - **PDF:** birleştirme, bölme, sayfa düzenleme (sürükle bırak, döndürme, silme), sıkıştırma
 - **Video:** kesme (video veya GIF), kırpma, hız, sesi kaldırma, kare çıkarma, bölme, bölge gizleme, birleştirme, sıkıştırma
 - **Ses:** kesme (sessiz uçları otomatik kırpma), seviye ve normalleştirme, mono/stereo, bip ile sansür, sesten görselleştiricili video
-- **Diğer:** meta veri görüntüleme ve temizleme, QR ve barkod okuma, arşiv açma, bağlantıdan indirme
+- **QR ve barkod:** görsel ve PDF’lerdeki kodları okur; web adresi, e‑posta, telefon, SMS, konum ve Wi‑Fi kodlarını tanır. Tek tıkla bağlantıya gider, Wi‑Fi şifresini kopyalar. Hedef alan adı açılmadan önce gösterilir, güvensiz `http` bağlantıları işaretlenir.
+- **Diğer:** meta veri görüntüleme ve temizleme, arşiv açma, bağlantıdan indirme
 
 **Uygulama**
 
@@ -171,7 +172,7 @@ Geliştirme derlemesi için `./scripts/build-app.sh --debug` kullanın.
 `v*` etiketi gönderildiğinde [Release iş akışı](.github/workflows/release.yml) testleri çalıştırır, uygulamayı paketler ve dosyaları GitHub Releases’a yükler. README’deki indirme bağlantıları her zaman en son sürümü gösterir.
 
 ```bash
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.3.0 && git push origin v0.3.0
 ```
 
 ## Proje yapısı
@@ -198,5 +199,7 @@ scripts/             build-app.sh, package.sh
 [**Download Orange.dmg**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange.dmg) (Apple silicon). Builds are not notarized yet; on first launch, open **System Settings › Privacy & Security** and click **Open Anyway**. Optional: `brew install yt-dlp` for downloading from video sites. See the [Privacy Notice](PRIVACY.md) and [Terms of Use](TERMS.md).
 
 ---
+
+<sub>WebP kodlama için Google’ın BSD lisanslı [libwebp](https://chromium.googlesource.com/webm/libwebp) kütüphanesi kullanılır; ayrıntılar [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasındadır.</sub>
 
 <sub>Orange bağımsız bir projedir; Tangerine, LEAP STUDIO, Nashi veya Apple ile bağlantılı değildir. macOS ve Liquid Glass, Apple Inc.’in ticari markalarıdır. İndirdiğiniz içeriklerin telif ve kullanım haklarına uymak kullanıcının sorumluluğundadır.</sub>

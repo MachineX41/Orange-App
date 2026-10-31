@@ -302,3 +302,73 @@ final class DownloadProgressTests: XCTestCase {
         XCTAssertGreaterThan(values[2], values[1])
     }
 }
+
+final class WebPTests: XCTestCase {
+    func testWebPIsWritableAndRoundTrips() throws {
+        XCTAssertTrue(ImageCapabilities.canWrite(.webp))
+        XCTAssertTrue(Catalog.convertTargets(for: URL(fileURLWithPath: "/tmp/a.jpg")).contains(.webp))
+        XCTAssertFalse(Catalog.convertTargets(for: URL(fileURLWithPath: "/tmp/a.webp")).contains(.webp))
+
+        let directory = try makeTempDirectory()
+        let source = directory.appendingPathComponent("swatch.png")
+        try ImageEngine.write(try makeSwatch(width: 64, height: 40), to: source, as: .png, quality: 1)
+        let output = try ImageEngine.convert(ImageRequest(source: source, format: .webp, quality: 0.9, directory: directory))
+        XCTAssertEqual(output.pathExtension, "webp")
+
+        let data = try Data(contentsOf: output)
+        XCTAssertEqual(String(decoding: data.prefix(4), as: UTF8.self), "RIFF")
+        XCTAssertEqual(String(decoding: data.dropFirst(8).prefix(4), as: UTF8.self), "WEBP")
+        let decoded = try ImageEngine.load(output)
+        XCTAssertEqual(decoded.width, 64)
+        XCTAssertEqual(decoded.height, 40)
+    }
+
+    func testTransparentWebPKeepsAlpha() throws {
+        let image = try ImageEngine.render(width: 8, height: 8) { context in
+            context.clear(CGRect(x: 0, y: 0, width: 8, height: 8))
+            context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 0.5))
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        let data = try WebPEncoder.encode(image, quality: 1, lossless: true)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let decoded = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        XCTAssertNotEqual(decoded.alphaInfo, .none)
+    }
+}
+
+final class CodeActionTests: XCTestCase {
+    func testWebLinks() {
+        XCTAssertEqual(CodeAction.parse("https://www.apple.com/tr/").destination, "apple.com")
+        XCTAssertEqual(CodeAction.parse("www.example.com/menu"), .web(URL(string: "https://www.example.com/menu")!))
+        XCTAssertEqual(CodeAction.parse("example.org"), .web(URL(string: "https://example.org")!))
+        XCTAssertTrue(CodeAction.parse("http://example.com").isInsecure)
+        XCTAssertFalse(CodeAction.parse("https://example.com").isInsecure)
+    }
+
+    func testContactSchemes() {
+        XCTAssertEqual(CodeAction.parse("mailto:ali@example.com").destination, "ali@example.com")
+        XCTAssertEqual(CodeAction.parse("ali@example.com"), .email(URL(string: "mailto:ali@example.com")!))
+        XCTAssertEqual(CodeAction.parse("tel:+905551112233").destination, "+905551112233")
+        guard case .message(let sms) = CodeAction.parse("SMSTO:+905551112233:Merhaba") else { return XCTFail() }
+        XCTAssertEqual(sms.scheme, "sms")
+        guard case .email(let mail) = CodeAction.parse("MATMSG:TO:ali@example.com;SUB:Selam;BODY:Nasılsın;;") else { return XCTFail() }
+        XCTAssertTrue(mail.absoluteString.hasPrefix("mailto:ali@example.com?"))
+        guard case .map(let map) = CodeAction.parse("geo:41.0082,28.9784") else { return XCTFail() }
+        XCTAssertEqual(map.host(), "maps.apple.com")
+    }
+
+    func testWifi() {
+        XCTAssertEqual(CodeAction.parse("WIFI:T:WPA;S:Ev Ağı;P:gizli\\;123;;"), .wifi(ssid: "Ev Ağı", password: "gizli;123"))
+        XCTAssertEqual(CodeAction.parse("WIFI:T:nopass;S:Kafe;;"), .wifi(ssid: "Kafe", password: nil))
+    }
+
+    func testUnsafeOrPlainPayloadsStayText() {
+        XCTAssertEqual(CodeAction.parse("javascript:alert(1)"), .text)
+        XCTAssertEqual(CodeAction.parse("file:///etc/passwd"), .text)
+        XCTAssertEqual(CodeAction.parse("x-apple.systempreferences:com.apple"), .text)
+        XCTAssertEqual(CodeAction.parse("4006381333931"), .text)
+        XCTAssertEqual(CodeAction.parse("Merhaba dünya"), .text)
+        XCTAssertEqual(CodeAction.parse("https://localhost"), .text)
+        XCTAssertEqual(CodeAction.parse("v1.2"), .text)
+    }
+}

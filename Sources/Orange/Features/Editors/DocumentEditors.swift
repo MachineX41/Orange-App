@@ -121,8 +121,19 @@ struct CodeReaderEditor: View {
     @State var hits: [BarcodeHit] = []
     @State var scanning = true
 
+    private var openable: [(hit: BarcodeHit, action: CodeAction)] {
+        hits.compactMap { hit in
+            let action = CodeAction.parse(hit.payload)
+            return action.url == nil ? nil : (hit, action)
+        }
+    }
+
+    private var single: CodeAction? {
+        openable.count == 1 ? openable[0].action : nil
+    }
+
     var body: some View {
-        EditorScaffold(primaryTitle: L("Copy All", "Tümünü Kopyala"), canApply: !hits.isEmpty, busy: scanning, apply: copyAll) {
+        EditorScaffold(primaryTitle: single.map(\.verb) ?? L("Copy All", "Tümünü Kopyala"), canApply: !hits.isEmpty, busy: scanning, apply: primary) {
             if scanning {
                 VStack(spacing: 12) {
                     ProgressView().controlSize(.large)
@@ -135,31 +146,7 @@ struct CodeReaderEditor: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(hits) { hit in
-                            HStack(alignment: .top, spacing: 14) {
-                                Image(systemName: hit.symbology.lowercased().contains("qr") ? "qrcode" : "barcode")
-                                    .font(.system(size: 26))
-                                    .foregroundStyle(OrangeTheme.accent)
-                                    .frame(width: 36)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(hit.payload)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .textSelection(.enabled)
-                                    Text([hit.symbology, hit.source, hit.page.map { L("page \($0)", "sayfa \($0)") }].compactMap { $0 }.joined(separator: " · "))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if let link = URL(string: hit.payload), link.scheme?.hasPrefix("http") == true {
-                                    Button(L("Open", "Aç")) { NSWorkspace.shared.open(link) }
-                                }
-                                Button(L("Copy", "Kopyala")) {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(hit.payload, forType: .string)
-                                }
-                            }
-                            .buttonStyle(.glass).tint(nil)
-                            .padding(16)
-                            .glassCard(radius: 18)
+                            CodeHitRow(hit: hit, action: CodeAction.parse(hit.payload)) { perform($0) }
                         }
                     }
                     .padding(22)
@@ -175,6 +162,15 @@ struct CodeReaderEditor: View {
                     }
                 }
                 InfoRow(title: L("Codes", "Kod"), value: "\(hits.count)")
+                if !openable.isEmpty {
+                    InfoRow(title: L("Links", "Bağlantı"), value: "\(openable.count)")
+                }
+            }
+            InspectorSection(title: L("Safety", "Güvenlik"), symbol: "checkmark.shield") {
+                Text(L("Codes never open on their own. Check the address shown under each code before you open it.", "Kodlar kendiliğinden açılmaz. Açmadan önce her kodun altındaki adresi kontrol edin."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .task {
@@ -184,11 +180,127 @@ struct CodeReaderEditor: View {
         }
     }
 
-    private func copyAll() {
+    private func primary() {
+        if let single {
+            perform(single)
+            editor.close()
+            return
+        }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(hits.map(\.payload).joined(separator: "\n"), forType: .string)
         runtime.toast(L("Copied", "Kopyalandı"), L("\(hits.count) code(s)", "\(hits.count) kod"), symbol: "qrcode", style: .info)
         editor.close()
+    }
+
+    private func perform(_ action: CodeAction) {
+        switch action {
+        case .wifi(let ssid, let password):
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(password ?? ssid, forType: .string)
+            runtime.toast(
+                password == nil ? L("Network name copied", "Ağ adı kopyalandı") : L("Wi‑Fi password copied", "Wi‑Fi şifresi kopyalandı"),
+                ssid,
+                symbol: "wifi",
+                style: .info
+            )
+        case .text:
+            break
+        default:
+            if let url = action.url { NSWorkspace.shared.open(url) }
+        }
+    }
+}
+
+extension CodeAction {
+    var verb: String {
+        switch self {
+        case .web: L("Go to Link", "Bağlantıya Git")
+        case .email: L("Write Email", "E‑posta Yaz")
+        case .phone: L("Call", "Ara")
+        case .message: L("Send Message", "Mesaj Gönder")
+        case .map: L("Open in Maps", "Haritada Aç")
+        case .wifi(_, let password): password == nil ? L("Copy Network", "Ağı Kopyala") : L("Copy Password", "Şifreyi Kopyala")
+        case .text: L("Copy", "Kopyala")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .web: "safari"
+        case .email: "envelope"
+        case .phone: "phone"
+        case .message: "message"
+        case .map: "map"
+        case .wifi: "wifi"
+        case .text: "text.alignleft"
+        }
+    }
+
+    var kindTitle: String {
+        switch self {
+        case .web: L("Website", "Web sitesi")
+        case .email: L("Email", "E‑posta")
+        case .phone: L("Phone", "Telefon")
+        case .message: L("Message", "Mesaj")
+        case .map: L("Location", "Konum")
+        case .wifi: L("Wi‑Fi network", "Wi‑Fi ağı")
+        case .text: L("Text", "Metin")
+        }
+    }
+}
+
+private struct CodeHitRow: View {
+    var hit: BarcodeHit
+    var action: CodeAction
+    var perform: (CodeAction) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: hit.symbology.lowercased().contains("qr") ? "qrcode" : "barcode")
+                .font(.system(size: 26))
+                .foregroundStyle(OrangeTheme.accent)
+                .frame(width: 36)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(hit.payload)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(4)
+                    .textSelection(.enabled)
+                if action != .text {
+                    HStack(spacing: 6) {
+                        Image(systemName: action.symbol)
+                        Text(action.kindTitle)
+                        if let destination = action.destination {
+                            Text("·")
+                            Text(destination).fontWeight(.semibold).foregroundStyle(.primary)
+                        }
+                        if action.isInsecure {
+                            Label(L("Not secure", "Güvenli değil"), systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Text([hit.symbology, hit.source, hit.page.map { L("page \($0)", "sayfa \($0)") }].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 8)
+            if action != .text {
+                Button(action.verb) { perform(action) }
+                    .buttonStyle(.glassProminent)
+                    .tint(OrangeTheme.accent)
+                    .help(action.url?.absoluteString ?? "")
+            }
+            Button(L("Copy", "Kopyala")) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(hit.payload, forType: .string)
+            }
+            .buttonStyle(.glass)
+            .tint(nil)
+        }
+        .padding(16)
+        .glassCard(radius: 18)
     }
 }
 

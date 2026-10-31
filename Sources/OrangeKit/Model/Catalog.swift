@@ -54,7 +54,7 @@ public enum ImageCapabilities {
 
     public static func canWrite(_ target: ConvertTarget) -> Bool {
         guard let type = target.imageType else { return false }
-        return writable.contains(type.identifier)
+        return target == .webp || writable.contains(type.identifier)
     }
 }
 
@@ -158,7 +158,7 @@ public enum Catalog {
         case .audio:
             list = [.m4a, .wav, .aiff]
         case .pdf:
-            list = [.png, .jpeg, .txt, .docx, .rtf]
+            list = [.png, .jpeg, .webp, .txt, .docx, .rtf]
         case .document:
             list = [.pdf, .docx, .rtf, .html, .odt, .txt]
         case .archive, .other:

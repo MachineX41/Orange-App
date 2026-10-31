@@ -211,6 +211,9 @@ public enum ImageEngine {
         properties: [String: Any] = [:]
     ) throws -> Data {
         guard let type = target.imageType else { throw OrangeError.unsupported(target.rawValue.uppercased()) }
+        if target == .webp && !ImageCapabilities.writable.contains(type.identifier) {
+            return try WebPEncoder.encode(image, quality: quality)
+        }
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil) else {
             throw OrangeError.unsupported(target.rawValue.uppercased())
