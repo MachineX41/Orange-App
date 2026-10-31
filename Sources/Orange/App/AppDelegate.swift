@@ -3,13 +3,56 @@ import OrangeKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var hidesLaunchWindow = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        let runtime = AppRuntime.shared
+        hidesLaunchWindow = runtime.showInMenuBar && !runtime.showOnboarding
+        NotificationCenter.default.addObserver(self, selector: #selector(windowVisibilityChanged),
+                                               name: NSWindow.didBecomeVisibleNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowVisibilityChanged),
+                                               name: NSWindow.willCloseNotification, object: nil)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Consent.accepted { DragWatcher.shared.start() }
-        NSApp.activate()
+
+        if hidesLaunchWindow {
+            // Pencere bu anda görünürse hemen gizle; değilse didBecomeVisible yakalayacak.
+            hidesLaunchWindow = !hideVisibleMainWindows()
+            AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar)
+        } else {
+            NSApp.activate()
+            DispatchQueue.main.async { AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar) }
+        }
+
         DispatchQueue.main.async { AppMover.offerIfNeeded() }
         #if DEBUG
         runDemoIfRequested()
         #endif
+    }
+
+    @discardableResult
+    private func hideVisibleMainWindows() -> Bool {
+        var hid = false
+        for window in NSApp.windows where window.isVisible && window.identifier?.rawValue.hasPrefix("main") == true {
+            window.orderOut(nil)
+            hid = true
+        }
+        return hid
+    }
+
+    @objc private func windowVisibilityChanged(_ notification: Notification) {
+        if hidesLaunchWindow,
+           notification.name == NSWindow.didBecomeVisibleNotification,
+           let window = notification.object as? NSWindow,
+           window.identifier?.rawValue.hasPrefix("main") == true {
+            window.orderOut(nil)
+            hidesLaunchWindow = false
+        }
+        DispatchQueue.main.async {
+            AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar)
+        }
     }
 
     /// The system Settings item's key changes with the macOS language (⌘Ö in Turkish), so it is read rather than assumed.
@@ -62,5 +105,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         AppRuntime.shared.importURLs(urls)
         AppRuntime.shared.showMainWindow()
+    }
+}
+
+@MainActor
+enum AppActivation {
+    /// OrbStack gibi: gerçek bir pencere görünürken regular (Dock + uygulama menüsü), aksi halde accessory.
+    static func sync(menuBarVisible: Bool) {
+        let hasWindow = NSApp.windows.contains {
+            ($0.isVisible || $0.isMiniaturized) && $0.styleMask.contains(.titled) && !($0 is NSPanel)
+        }
+        let policy: NSApplication.ActivationPolicy = (hasWindow || !menuBarVisible) ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
     }
 }

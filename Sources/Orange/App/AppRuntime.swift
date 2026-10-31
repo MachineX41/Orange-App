@@ -37,7 +37,7 @@ final class AppRuntime {
     var soundOnDone: Bool { didSet { save() } }
     var hapticOnWheel: Bool { didSet { save() } }
     var wheelEnabled: Bool { didSet { save() } }
-    var showInMenuBar: Bool { didSet { save() } }
+    var showInMenuBar: Bool { didSet { save(); AppActivation.sync(menuBarVisible: showInMenuBar) } }
     var imageQuality: Double { didSet { save() } }
     var ocrDefaultModelID: String { didSet { save() } }
     var ocrComputePreference: String { didSet { save() } }
@@ -204,6 +204,7 @@ final class AppRuntime {
     }
 
     func showMainWindow() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
             window.makeKeyAndOrderFront(nil)
