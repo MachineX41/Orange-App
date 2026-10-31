@@ -265,6 +265,34 @@ extension WheelMode {
         case .actions: "⌃"
         }
     }
+
+    /// Opens the same wheel for the current selection inside the window.
+    var menuKey: KeyEquivalent {
+        switch self {
+        case .convert: "e"
+        case .tools: "t"
+        case .actions: "j"
+        }
+    }
+
+    var menuKeyText: String { "⌘" + String(menuKey.character).uppercased() }
+
+    var explanation: String {
+        switch self {
+        case .convert: L("Formats appear around your file. Drop it on one to get a converted copy.", "Biçimler dosyanın çevresinde belirir. Birine bırakın, dönüştürülmüş kopya oluşsun.")
+        case .tools: L("Edit, compress, trim or redact in a focused editor.", "Düzenleyin, sıkıştırın, kesin ya da gizleyin; odaklı bir editörde.")
+        case .actions: L("Shelf, copy, move, AirDrop, zip or open in Terminal.", "Raf, kopyala, taşı, AirDrop, sıkıştır ya da Terminal’de aç.")
+        }
+    }
+
+    /// Slice icons used by the animated guide.
+    var sampleSymbols: [String] {
+        switch self {
+        case .convert: ["photo", "photo", "photo", "doc.richtext", "photo.stack", "photo", "photo", "text.alignleft"]
+        case .tools: ["slider.horizontal.3", "crop", "arrow.down.right.and.arrow.up.left", "pencil.tip.crop.circle", "eye.slash", "rectangle.inset.filled", "info.circle", "ellipsis"]
+        case .actions: ["tray.and.arrow.down", "doc.on.clipboard", "folder", "link", "plus.square.on.square", "magnifyingglass", "airplayaudio", "doc.zipper"]
+        }
+    }
 }
 
 extension Error {

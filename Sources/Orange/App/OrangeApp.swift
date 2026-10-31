@@ -1,3 +1,4 @@
+import OrangeKit
 import SwiftUI
 
 @main
@@ -20,13 +21,19 @@ struct OrangeApp: App {
                 Button(L("Open Files…", "Dosya Aç…")) { runtime.openFiles() }
                     .keyboardShortcut("o")
                 Button(L("Try a Sample", "Örnek Dene")) { runtime.useSample() }
+                Divider()
+                Button(L("Clear Selection", "Seçimi Temizle")) { runtime.selection.removeAll() }
+                    .keyboardShortcut(.delete)
+                    .disabled(runtime.selection.isEmpty)
             }
             CommandMenu(L("Wheel", "Çark")) {
                 ForEach(WheelMode.allCases, id: \.self) { mode in
                     Button(L("\(mode.title) Wheel", "\(mode.title) Çarkı")) { runtime.presentLocalWheel(mode) }
+                        .keyboardShortcut(mode.menuKey)
                         .disabled(runtime.selection.isEmpty)
                 }
                 Divider()
+                Toggle(L("Drag Wheel Everywhere", "Her Yerde Sürükleme Çarkı"), isOn: Binding(get: { runtime.wheelEnabled }, set: { runtime.wheelEnabled = $0 }))
                 Button(L("Floating Shelf", "Yüzen Raf")) { FloatShelf.shared.toggle() }
                     .keyboardShortcut("l", modifiers: [.command, .shift])
             }
@@ -35,6 +42,20 @@ struct OrangeApp: App {
                 Button(L("Download", "İndir")) { runtime.section = .download }.keyboardShortcut("2")
                 Button(L("Library", "Kitaplık")) { runtime.section = .library }.keyboardShortcut("3")
                 Button(L("Shelf", "Raf")) { runtime.section = .shelf }.keyboardShortcut("4")
+                Divider()
+                ForEach(Array(MediaKind.toolKinds.enumerated()), id: \.element) { index, kind in
+                    Button(kind.title) { runtime.section = .tools(kind) }
+                        .keyboardShortcut(KeyEquivalent(Character(String(index + 5))))
+                }
+                Divider()
+                Toggle(L("Show in Menu Bar", "Menü Çubuğunda Göster"), isOn: Binding(get: { runtime.showInMenuBar }, set: { runtime.showInMenuBar = $0 }))
+            }
+            CommandGroup(replacing: .help) {
+                Button(L("Keyboard Shortcuts", "Klavye Kısayolları")) {
+                    runtime.showMainWindow()
+                    runtime.showShortcuts = true
+                }
+                .keyboardShortcut("/")
             }
         }
 
@@ -42,13 +63,14 @@ struct OrangeApp: App {
             SettingsView()
                 .environment(runtime)
                 .preferredColorScheme(runtime.appearance.colorScheme)
+                .tint(OrangeTheme.accent)
         }
 
-        MenuBarExtra {
+        MenuBarExtra(isInserted: Binding(get: { runtime.showInMenuBar }, set: { runtime.showInMenuBar = $0 })) {
             MenuBarView()
                 .environment(runtime)
         } label: {
-            OrangeMark(side: 18)
+            Image(nsImage: MenuBarIcon.image)
         }
     }
 }

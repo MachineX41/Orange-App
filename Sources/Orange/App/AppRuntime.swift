@@ -37,7 +37,9 @@ final class AppRuntime {
     var soundOnDone: Bool { didSet { save() } }
     var hapticOnWheel: Bool { didSet { save() } }
     var wheelEnabled: Bool { didSet { save() } }
+    var showInMenuBar: Bool { didSet { save() } }
     var imageQuality: Double { didSet { save() } }
+    var showShortcuts = false
     var customOutputPath: String? {
         didSet {
             OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -49,12 +51,16 @@ final class AppRuntime {
 
     var recentOutputs: [URL] {
         var seen = Set<String>()
-        return jobs.lazy
-            .filter { $0.state == .success }
-            .flatMap(\.outputPaths)
-            .filter { FileManager.default.fileExists(atPath: $0) && seen.insert($0).inserted }
-            .prefix(12)
-            .map { URL(fileURLWithPath: $0) }
+        var urls: [URL] = []
+        for job in jobs where job.state == .success {
+            for path in job.outputPaths where !seen.contains(path) {
+                seen.insert(path)
+                guard FileManager.default.fileExists(atPath: path) else { continue }
+                urls.append(URL(fileURLWithPath: path))
+                if urls.count == 12 { return urls }
+            }
+        }
+        return urls
     }
 
     private let store = LibraryStore()
@@ -68,6 +74,7 @@ final class AppRuntime {
         soundOnDone = defaults.object(forKey: "soundOnDone") as? Bool ?? true
         hapticOnWheel = defaults.object(forKey: "hapticOnWheel") as? Bool ?? true
         wheelEnabled = defaults.object(forKey: "wheelEnabled") as? Bool ?? true
+        showInMenuBar = defaults.object(forKey: "showInMenuBar") as? Bool ?? true
         imageQuality = defaults.object(forKey: "imageQuality") as? Double ?? 0.88
         customOutputPath = defaults.string(forKey: "customOutputPath")
         OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -91,6 +98,7 @@ final class AppRuntime {
         defaults.set(soundOnDone, forKey: "soundOnDone")
         defaults.set(hapticOnWheel, forKey: "hapticOnWheel")
         defaults.set(wheelEnabled, forKey: "wheelEnabled")
+        defaults.set(showInMenuBar, forKey: "showInMenuBar")
         defaults.set(imageQuality, forKey: "imageQuality")
         defaults.set(customOutputPath, forKey: "customOutputPath")
     }

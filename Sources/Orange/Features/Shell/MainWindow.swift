@@ -27,9 +27,11 @@ struct MainWindow: View {
             .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 260)
         } detail: {
             ZStack {
-                OrangeBackdrop(intensity: 0.85)
+                OrangeBackdrop(intensity: 0.6)
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .id(runtime.section)
+                    .transition(.opacity.combined(with: .offset(y: 8)))
                 if dropTargeted {
                     RoundedRectangle(cornerRadius: 26, style: .continuous)
                         .strokeBorder(OrangeTheme.accent, style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
@@ -61,8 +63,16 @@ struct MainWindow: View {
                     Label(L("Open Files", "Dosya Aç"), systemImage: "plus")
                 }
                 .help(L("Open Files (⌘O)", "Dosya Aç (⌘O)"))
+                Button {
+                    runtime.showShortcuts = true
+                } label: {
+                    Label(L("Keyboard Shortcuts", "Klavye Kısayolları"), systemImage: "keyboard")
+                }
+                .help(L("Keyboard Shortcuts (⌘/)", "Klavye Kısayolları (⌘/)"))
             }
         }
+        .sheet(isPresented: $runtime.showShortcuts) { ShortcutsSheet() }
+        .animation(.easeOut(duration: 0.22), value: runtime.section)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: runtime.localWheel)
         .onAppear { runtime.openWindowAction = openWindow }
     }

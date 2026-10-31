@@ -13,12 +13,17 @@ struct HomeView: View {
                     subtitle: L("Convert, edit and move files right where you drag them.", "Dosyaları sürüklediğiniz yerde dönüştürün, düzenleyin, taşıyın."),
                     brand: true
                 )
-                if runtime.selection.isEmpty {
-                    DropZone()
-                } else {
-                    SelectionPanel()
+                Group {
+                    if runtime.selection.isEmpty {
+                        DropZone()
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    } else {
+                        SelectionPanel()
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
-                GestureGuide()
+                .animation(.spring(response: 0.38, dampingFraction: 0.88), value: runtime.selection.isEmpty)
+                HowItWorks()
                 if !runtime.recentOutputs.isEmpty {
                     RecentStrip(urls: runtime.recentOutputs)
                 }
@@ -39,6 +44,7 @@ struct DropZone: View {
             Image(systemName: "arrow.down.doc")
                 .font(.system(size: 26, weight: .light))
                 .foregroundStyle(.secondary)
+                .symbolEffect(.bounce.down, options: .repeat(.periodic(delay: 3.5)))
             VStack(spacing: 5) {
                 Text(L("Drop files to begin", "Başlamak için dosya bırakın"))
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -62,6 +68,13 @@ struct DropZone: View {
                 .buttonStyle(.glass).tint(nil)
             }
             .controlSize(.large)
+            HStack(spacing: 6) {
+                Text(L("or press", "ya da"))
+                KeyCombo(keys: ["⌘", "O"])
+                Text(L("· drop anywhere in this window", "· bu pencerede herhangi bir yere bırakın"))
+            }
+            .font(.system(size: 11.5))
+            .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 44)
@@ -93,10 +106,15 @@ struct SelectionPanel: View {
                             Button {
                                 runtime.presentLocalWheel(mode)
                             } label: {
-                                Label(mode.title, systemImage: mode.symbol)
+                                HStack(spacing: 6) {
+                                    Label(mode.title, systemImage: mode.symbol)
+                                    Text(mode.menuKeyText)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.tertiary)
+                                }
                             }
                             .buttonStyle(.glass).tint(nil)
-                            .help(L("Open the \(mode.title) wheel", "\(mode.title) çarkını aç"))
+                            .help(L("Open the \(mode.title) wheel (\(mode.menuKeyText))", "\(mode.title) çarkını aç (\(mode.menuKeyText))"))
                         }
                     }
                 }
@@ -115,7 +133,7 @@ struct SelectionPanel: View {
                 }
                 .buttonStyle(.glass).tint(nil)
                 .buttonBorderShape(.circle)
-                .help(L("Clear Selection", "Seçimi Temizle"))
+                .help(L("Clear Selection (⌘⌫)", "Seçimi Temizle (⌘⌫)"))
             }
 
             ScrollView(.horizontal) {
@@ -228,39 +246,6 @@ struct FileChip: View {
             Divider()
             Button(L("Remove", "Kaldır")) { runtime.remove(file) }
         }
-    }
-}
-
-struct GestureGuide: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(title: L("Drag anywhere, then hold a key", "Herhangi bir yerde sürükleyin, sonra bir tuşa basılı tutun"), symbol: "hand.draw")
-            HStack(spacing: 12) {
-                tile(.convert, L("Formats appear around your file. The wheel stays put, so just drag onto one.", "Biçimler dosyanızın etrafında belirir. Çark sabit kalır, birinin üzerine sürükleyin."))
-                tile(.tools, L("Edit, compress, trim, redact and more, opened in a focused editor.", "Düzenle, sıkıştır, kes, gizle ve fazlası, odaklı bir editörde."))
-                tile(.actions, L("Shelf, copy, move, AirDrop, zip or open in Terminal.", "Raf, kopyala, taşı, AirDrop, sıkıştır ya da Terminal’de aç."))
-            }
-        }
-    }
-
-    private func tile(_ mode: WheelMode, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                KeyCap(text: mode.key)
-                Text(mode.title).font(.system(size: 14, weight: .semibold))
-                Spacer()
-                Image(systemName: mode.symbol)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(.tertiary)
-            }
-            Text(text)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .glassCard(radius: 20)
     }
 }
 

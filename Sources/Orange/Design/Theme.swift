@@ -35,16 +35,16 @@ extension Color {
     }
 }
 
-/// Warm animated mesh behind every window, the colour that Liquid Glass refracts.
+/// Quiet, mostly neutral mesh behind every window. Orange is only a faint glow so glass stays readable.
 struct OrangeBackdrop: View {
     @Environment(\.colorScheme) private var scheme
     var intensity: Double = 1
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
+        TimelineView(.animation(minimumInterval: 1 / 15)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
-            let drift = Float(sin(t / 7) * 0.06)
-            let sway = Float(cos(t / 9) * 0.05)
+            let drift = Float(sin(t / 11) * 0.05)
+            let sway = Float(cos(t / 13) * 0.04)
             MeshGradient(
                 width: 3,
                 height: 3,
@@ -63,15 +63,15 @@ struct OrangeBackdrop: View {
     private var palette: [Color] {
         if scheme == .dark {
             return [
-                Color(hex: 0x2A1206), Color(hex: 0x3A1508), Color(hex: 0x24080F),
-                Color(hex: 0x4A1D07), Color(hex: 0x6B2A0A), Color(hex: 0x3B0D1F),
-                Color(hex: 0x1A0A06), Color(hex: 0x2E0B1A), Color(hex: 0x1C0A24)
+                Color(hex: 0x1B1A19), Color(hex: 0x1D1B1A), Color(hex: 0x18181B),
+                Color(hex: 0x1E1B19), Color(hex: 0x2A1D14), Color(hex: 0x1A191C),
+                Color(hex: 0x161616), Color(hex: 0x19181A), Color(hex: 0x17171A)
             ]
         }
         return [
-            Color(hex: 0xFFE7B3), Color(hex: 0xFFC978), Color(hex: 0xFFB37A),
-            Color(hex: 0xFFB258), Color(hex: 0xFF8A3D), Color(hex: 0xF7798A),
-            Color(hex: 0xFF9F6B), Color(hex: 0xF06A8F), Color(hex: 0xB77BE0)
+            Color(hex: 0xF7F6F4), Color(hex: 0xF6F3EF), Color(hex: 0xF3F2F2),
+            Color(hex: 0xF5F1EC), Color(hex: 0xFBE6D4), Color(hex: 0xF2F0F1),
+            Color(hex: 0xF1F0EE), Color(hex: 0xF3EFEC), Color(hex: 0xEFEEF1)
         ]
     }
 }
@@ -116,6 +116,36 @@ struct OrangeMark: View {
     }()
 }
 
+/// Monochrome wheel for the menu bar. A template image so macOS tints it like its own status items.
+enum MenuBarIcon {
+    static let image: NSImage = {
+        let side: CGFloat = 18
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let outer: CGFloat = 8.4
+            let inner: CGFloat = 4.1
+            let count = 8
+            let slice = 2 * CGFloat.pi / CGFloat(count)
+            let gap: CGFloat = 0.2
+            NSColor.black.setFill()
+            for index in 0..<count {
+                let start = CGFloat(index) * slice + gap / 2 + .pi / 8
+                let end = start + slice - gap
+                let path = NSBezierPath()
+                path.appendArc(withCenter: center, radius: outer, startAngle: start * 180 / .pi, endAngle: end * 180 / .pi)
+                path.appendArc(withCenter: center, radius: inner, startAngle: end * 180 / .pi, endAngle: start * 180 / .pi, clockwise: true)
+                path.close()
+                path.fill()
+            }
+            NSBezierPath(ovalIn: CGRect(x: center.x - 1.7, y: center.y - 1.7, width: 3.4, height: 3.4)).fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Orange"
+        return image
+    }()
+}
+
 struct SectionLabel: View {
     var title: String
     var symbol: String?
@@ -136,13 +166,30 @@ struct SectionLabel: View {
 
 struct KeyCap: View {
     var text: String
+    var pressed = false
 
     var body: some View {
         Text(text)
             .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(pressed ? Color.white : Color.primary)
+            .frame(minWidth: 14)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .glassEffect(pressed ? .regular.tint(OrangeTheme.accent) : .regular, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .scaleEffect(pressed ? 0.92 : 1)
+    }
+}
+
+/// A shortcut such as ⇧⌘L drawn as separate keys.
+struct KeyCombo: View {
+    var keys: [String]
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
+                KeyCap(text: key)
+            }
+        }
     }
 }
 

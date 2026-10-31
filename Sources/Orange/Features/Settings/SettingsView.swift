@@ -16,6 +16,7 @@ struct SettingsView: View {
                         Text(L("Dark", "Koyu")).tag(AppearanceChoice.dark)
                     }
                     .pickerStyle(.segmented)
+                    Toggle(L("Show Orange in the menu bar", "Orange’ı menü çubuğunda göster"), isOn: $runtime.showInMenuBar)
                 }
                 Section(L("When a job finishes", "Bir iş bittiğinde")) {
                     Toggle(L("Play a sound", "Ses çal"), isOn: $runtime.soundOnDone)
@@ -98,28 +99,55 @@ struct MenuBarView: View {
 
     var body: some View {
         @Bindable var runtime = runtime
-        Button(L("Open Orange", "Orange’ı Aç")) {
-            runtime.openWindowAction = openWindow
-            runtime.showMainWindow()
-        }
-        Button(L("Floating Shelf", "Yüzen Raf")) { FloatShelf.shared.toggle() }
+        Button(L("Open Orange", "Orange’ı Aç")) { show() }
         Button(L("Open Files…", "Dosya Aç…")) {
-            runtime.openWindowAction = openWindow
-            runtime.showMainWindow()
+            show()
             runtime.openFiles()
         }
+        Button(L("Floating Shelf", "Yüzen Raf")) { FloatShelf.shared.toggle() }
+
         Divider()
         Toggle(L("Drag Wheel", "Sürükleme Çarkı"), isOn: $runtime.wheelEnabled)
+        Text(L("Drag a file and hold ⇧ Convert, ⌘ Tools or ⌃ Actions", "Dosyayı sürükleyip ⇧ Dönüştür, ⌘ Araçlar ya da ⌃ Eylemler’e basılı tutun"))
+
         if !runtime.running.isEmpty {
             Divider()
-            ForEach(runtime.running) { job in
-                Text("\(job.title) · \(Int((runtime.progress[job.id] ?? 0) * 100))%")
+            Section(L("Working", "Çalışıyor")) {
+                ForEach(runtime.running) { job in
+                    Text("\(job.title) · \(Int((runtime.progress[job.id] ?? 0) * 100))%")
+                }
             }
         }
+
+        let recent = Array(runtime.recentOutputs.prefix(5))
+        if !recent.isEmpty {
+            Divider()
+            Menu(L("Recent Results", "Son Sonuçlar")) {
+                ForEach(recent, id: \.self) { url in
+                    Button(url.lastPathComponent) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                }
+                Divider()
+                Button(L("Show Library", "Kitaplığı Göster")) {
+                    runtime.section = .library
+                    show()
+                }
+            }
+        }
+
         Divider()
+        Button(L("Keyboard Shortcuts", "Klavye Kısayolları")) {
+            show()
+            runtime.showShortcuts = true
+        }
         SettingsLink { Text(L("Settings…", "Ayarlar…")) }
             .keyboardShortcut(",")
+        Button(L("Hide from Menu Bar", "Menü Çubuğundan Gizle")) { runtime.showInMenuBar = false }
         Button(L("Quit Orange", "Orange’dan Çık")) { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    private func show() {
+        runtime.openWindowAction = openWindow
+        runtime.showMainWindow()
     }
 }
