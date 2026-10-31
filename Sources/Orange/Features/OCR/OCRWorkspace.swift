@@ -68,7 +68,7 @@ struct OCRWorkspace: View {
                 Text(L("Turkish + English", "Türkçe + İngilizce")).tag("tr+en")
             }
             .pickerStyle(.menu)
-            .disabled(model.isRunning || !languageEditable)
+            .disabled(model.isRunning)
             .frame(maxWidth: 190)
 
             Picker(L("Mode", "Mod"), selection: Binding(
@@ -326,24 +326,8 @@ struct OCRWorkspace: View {
     // MARK: - Options plumbing
 
     private var availableModels: [(id: OCRModelID, displayName: String)] {
-        OCRModelCatalog.all.compactMap { entry in
-            guard entry.id == .appleVision || isInstalled(entry) else { return nil }
-            return (entry.id, entry.displayName)
-        }
+        OCRModelCatalog.all.map { ($0.id, $0.displayName) }
     }
-
-    private func isInstalled(_ entry: OCRModelEntry) -> Bool {
-        // Synchronous check would block; conservatively show all and let run
-        // fail with an actionable message if files are missing.
-        _ = entry
-        return true
-    }
-
-    private var supportedModes: [OCRMode] {
-        OCRModelCatalog.entry(for: model.options.modelID)?.modes ?? [.text]
-    }
-
-    private var languageEditable: Bool { true }
 
     private var languageTag: String {
         let ids = model.options.languageIdentifiers

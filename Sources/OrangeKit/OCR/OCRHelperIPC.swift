@@ -57,27 +57,6 @@ public enum OCRHelperIPC {
             self.mode = mode.rawValue
         }
     }
-
-    public struct ShutdownCommand: Codable, Sendable {
-        public var type: String = "shutdown"
-        public var protocolVersion: Int = 1
-    }
-
-    public struct Capabilities: Codable, Sendable {
-        public var protocolVersion: Int
-        public var runtimeRevision: String
-        public var cpuAvailable: Bool
-        public var metalAvailable: Bool
-        public var recommendedMetalBytes: Int64?
-    }
-
-    public enum EventKind: String, Codable, Sendable {
-        case ready
-        case progress
-        case result
-        case error
-    }
-
     public struct Event: Codable, Sendable {
         public var type: String
         public var protocolVersion: Int
@@ -91,41 +70,5 @@ public enum OCRHelperIPC {
         public var truncated: Bool?
         public var code: String?
         public var message: String?
-    }
-
-    public enum HelperError: Error, Sendable {
-        case invalidRequest(String)
-        case modelLoad(String)
-        case metalUnavailable(String)
-        case metalInitialization(String)
-        case outOfMemory(String)
-        case contextOverflow(String)
-        case decodeFailed(String)
-    }
-}
-
-/// Pinned per-model prompts. One literal prompt per family — never a single
-/// generic "OCR" string. Native helper selects by modelID; app never injects
-/// free-form prompts.
-public enum OCRModelPrompts {
-    public static func textPrompt(for id: OCRModelID) -> String {
-        switch id {
-        case .appleVision:
-            "Transcribe all visible text exactly. Preserve reading order and line breaks."
-        case .glmOCR:
-            "Text Recognition:"
-        case .paddleOCRVL16:
-            "OCR:"
-        case .qwen3VL2B:
-            "Transcribe all visible text exactly. Preserve reading order and line breaks."
-        case .dotsOCR:
-            "Extract the text content from this image."
-        case .deepseekOCR2:
-            "Free OCR."
-        }
-    }
-
-    public static func documentPrompt(for id: OCRModelID) -> String {
-        "Transcribe this document as Markdown. Preserve all visible text, reading order, headings, lists, tables and formulas. Do not translate, summarize, or invent content."
     }
 }

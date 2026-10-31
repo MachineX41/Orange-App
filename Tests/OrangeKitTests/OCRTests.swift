@@ -61,24 +61,6 @@ enum OCRFixtures {
         guard document.write(to: url) else { throw OrangeError.writeFailed("mixed.pdf") }
         return url
     }
-
-    /// 2x3 table + list document for document-mode structure tests.
-    static func tableDocument(in directory: URL) throws -> URL {
-        let text = """
-        Items
-        Name | Price | Qty
-        Apple | 1.50 | 2
-        Pear | 2.00 | 3
-        - first
-        - second
-        """
-        let url = directory.appendingPathComponent("table.pdf")
-        let document = PDFDocument()
-        let page = PDFPage(attributedString: NSAttributedString(string: text))
-        document.insert(page!, at: 0)
-        guard document.write(to: url) else { throw OrangeError.writeFailed("table.pdf") }
-        return url
-    }
 }
 
 // MARK: - Controlled test engines

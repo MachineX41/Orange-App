@@ -29,7 +29,6 @@ public final class OCRModelDownloader: NSObject {
     private let delegate: DownloadDelegate
     private var task: URLSessionDataTask?
     private var sink: PartSink?
-    private var artifactIndex = 0
     private var received: Int64 = 0
 
     private struct PartSink {
@@ -56,17 +55,6 @@ public final class OCRModelDownloader: NSObject {
         self.delegate = delegate
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         self.session = session
-        super.init()
-        delegate.owner = self
-    }
-
-    /// Test seam: drive status-code/redirect logic without a network.
-    init(entry: OCRModelEntry, store: OCRModelStore, session: URLSession, delegate: DownloadDelegate) {
-        self.entry = entry
-        self.store = store
-        self.configuration = session.configuration
-        self.session = session
-        self.delegate = delegate
         super.init()
         delegate.owner = self
     }

@@ -29,9 +29,6 @@ final class OCRWorkspaceModel {
         var sourceURL: URL
         var pageIndex: Int
         var id: String { "\(sourceURL.standardizedFileURL.path)#\(pageIndex)" }
-        /// 160px cached thumbnail, max 6 retained app-wide.
-        var thumbnail: CGImage?
-        var preview: CGImage?
         var text: String = ""
         var editedText: String = ""
         var editedMarkdown: String = ""

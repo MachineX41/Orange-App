@@ -156,18 +156,11 @@ struct LoadedModel {
     common_sampler* sampler = nullptr;
     mtmd::context_ptr vision;
     common_chat_templates_ptr templates;
-    bool useJinja = false;
     std::string modelID;
     int nBatch = 512;
-    int nThreads = 4;
     bool projectorCPUOnly = false;
     llama_pos nPast = 0;
 };
-
-bool endsWith(const std::string& value, const std::string& suffix) {
-    return value.size() >= suffix.size() &&
-           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
 
 int doLoad(LoadedModel& loaded, const std::string& line) {
     std::string requestID = field(line, "requestID");
@@ -245,7 +238,6 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     loaded.templates = common_chat_templates_init(model, "");
     loaded.modelID = modelID;
     loaded.nBatch = params.n_batch;
-    loaded.nThreads = params.cpuparams.n_threads;
     loaded.projectorCPUOnly = projectorCPU;
     loaded.nPast = 0;
 
@@ -288,7 +280,7 @@ int doRecognize(LoadedModel& loaded, const std::string& line) {
     user.role = "user";
     user.content = prompt + marker;
     std::string formatted = common_chat_format_single(
-        loaded.templates.get(), {}, user, true, loaded.useJinja);
+        loaded.templates.get(), {}, user, true, false);
 
     std::vector<std::string> segments = splitMarker(formatted, marker);
     const mtmd_bitmap* raw = bitmap.get();

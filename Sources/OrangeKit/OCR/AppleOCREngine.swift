@@ -110,22 +110,20 @@ struct OCRDocumentRenderer: Sendable {
         var tables: [OCRTable] = []
         for observation in observations {
             let container = observation.document
-            let emitted = renderContainer(container, textParts: &textParts, markdownParts: &markdownParts, blocks: &blocks, tables: &tables)
-            _ = emitted
+            renderContainer(container, textParts: &textParts, markdownParts: &markdownParts, blocks: &blocks, tables: &tables)
         }
         let text = textParts.joined(separator: mode == .document ? "\n\n" : "\n")
         let markdown = mode == .document ? markdownParts.joined(separator: "\n\n") : nil
         return OCRPageContent(text: text, markdown: markdown, blocks: blocks, tables: tables, actualCompute: .appleManaged)
     }
 
-    @discardableResult
     private func renderContainer(
         _ container: DocumentObservation.Container,
         textParts: inout [String],
         markdownParts: inout [String],
         blocks: inout [OCRTextBlock],
         tables: inout [OCRTable]
-    ) -> Bool {
+    ) {
         // Title first, then the full-text transcript as the paragraph source.
         if let title = container.title, !title.transcript.isEmpty {
             textParts.append(title.transcript)
@@ -179,7 +177,6 @@ struct OCRDocumentRenderer: Sendable {
             if !flat.isEmpty, !paragraphTexts.contains(flat) { textParts.append(flat) }
             markdownParts.append(markdownTable(grid: grid, spanned: spanned))
         }
-        return true
     }
 
     private func markdownTable(grid: [[String]], spanned: Bool) -> String {

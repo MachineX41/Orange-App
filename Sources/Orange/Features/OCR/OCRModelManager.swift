@@ -23,7 +23,6 @@ final class OCRModelManager {
     var rows: [Row] = OCRModelCatalog.all.map { Row(entry: $0) }
     var query = ""
     var installedOnly = false
-    var activeID: OCRModelID?
     private var downloader: OCRModelDownloader?
     private let store = OCRModelStore()
 
@@ -48,22 +47,9 @@ final class OCRModelManager {
         Task {
             for index in rows.indices {
                 let entry = rows[index].entry
-                if entry.id == .appleVision {
-                    rows[index].state = .installed
-                    continue
-                }
-                let status = await store.status(for: entry)
-                if rows[index].state != .downloading(received: 0, total: 0) {
-                    switch status {
-                    case .installed: rows[index].state = .installed
-                    case .notInstalled:
-                        if case .installed = rows[index].state { rows[index].state = .notInstalled }
-                        else if case .notInstalled = rows[index].state {}
-                        else if case .failed = rows[index].state {}
-                        else if case .paused = rows[index].state {}
-                        else { rows[index].state = .notInstalled }
-                    }
-                }
+                if entry.id == .appleVision { rows[index].state = .installed; continue }
+                if case .downloading = rows[index].state { continue }
+                rows[index].state = await store.status(for: entry) == .installed ? .installed : .notInstalled
             }
         }
     }
@@ -102,7 +88,6 @@ final class OCRModelManager {
         // Next job uses the new default; the running inference keeps its snapshot.
         AppRuntime.shared.ocrDefaultModelID = entry.id.rawValue
         AppRuntime.shared.ocrWorkspace.options.modelID = entry.id
-        activeID = entry.id
     }
 
     private func receivedOf(_ row: Row) -> Int64 {

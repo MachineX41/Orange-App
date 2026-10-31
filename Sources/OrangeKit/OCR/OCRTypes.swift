@@ -11,8 +11,6 @@ public enum OCRModelID: String, Codable, CaseIterable, Sendable {
     case dotsOCR = "dots-ocr"
     case deepseekOCR2 = "deepseek-ocr-2"
 
-    /// Models beyond Apple ship as downloadable GGUF pairs.
-    public var isDownloadable: Bool { self != .appleVision }
 }
 
 public enum OCRMode: String, Codable, Sendable, CaseIterable {

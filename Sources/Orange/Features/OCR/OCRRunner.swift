@@ -2,15 +2,11 @@ import AppKit
 import Foundation
 import OrangeKit
 
-/// Executes the OCR queue owned by `AppRuntime.ocrWorkspace`. Options are
-/// snapshotted at start; page results stream into the model at most 10Hz
-/// (full page results flush immediately), thumbnails capped at 6 total.
+/// Executes the OCR queue owned by `AppRuntime.ocrWorkspace`.
 /// Exports use the edited buffers and never touch originals.
 @MainActor
 final class OCRRunner {
     private let runtime: AppRuntime
-    private var lastFlush = Date.distantPast
-    private var pendingFlush = false
 
     init(runtime: AppRuntime) {
         self.runtime = runtime
@@ -50,19 +46,6 @@ final class OCRRunner {
     func cancel() {
         model.task?.cancel()
         model.cancelRun()
-    }
-
-    private func snapshotOptions() -> OCROptions {
-        var options = OCROptions(
-            modelID: OCRModelID(rawValue: runtime.ocrDefaultModelID) ?? .appleVision,
-            mode: OCRMode(rawValue: runtime.ocrMode) ?? .text,
-            languageIdentifiers: runtime.ocrLanguageIdentifiers,
-            compute: OCRComputePreference(rawValue: runtime.ocrComputePreference) ?? .automatic,
-            quality: OCRQuality(rawValue: runtime.ocrQuality) ?? .balanced
-        )
-        // Workspace edits win over stale saved prefs within the session.
-        options = model.options
-        return options
     }
 
     private func optionsLabel(_ options: OCROptions) -> String {
@@ -122,15 +105,6 @@ final class OCRRunner {
         model.pages[index].actualCompute = page.content.actualCompute
         model.pages[index].stale = false
         model.activeComputeLabel = computeLabel(page.content.actualCompute)
-        maybeRenderThumbs(for: index)
-        // 10Hz throttle for streaming updates; page completions flush at once.
-        let now = Date()
-        if now.timeIntervalSince(lastFlush) > 0.1 || pendingFlush {
-            lastFlush = now
-            pendingFlush = false
-        } else {
-            pendingFlush = true
-        }
     }
 
     private func computeLabel(_ compute: OCRActualCompute) -> String {
