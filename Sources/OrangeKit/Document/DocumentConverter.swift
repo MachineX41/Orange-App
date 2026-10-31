@@ -8,11 +8,11 @@ public enum DocumentConverter {
         return try DispatchQueue.main.sync(execute: body)
     }
 
-    public static func load(_ url: URL) throws -> NSAttributedString {
+    public static func load(_ url: URL) async throws -> NSAttributedString {
         let ext = Catalog.canonicalExtension(url.pathExtension)
         switch ext {
         case "pdf":
-            return try PDFToolkit.attributedText(of: url)
+            return try await PDFToolkit.attributedText(of: url)
         case "txt", "text", "md":
             let text = try readPlainText(url)
             return NSAttributedString(string: text, attributes: [
@@ -50,8 +50,8 @@ public enum DocumentConverter {
         throw OrangeError.unreadable(url.lastPathComponent)
     }
 
-    public static func convert(_ url: URL, to target: ConvertTarget) throws -> URL {
-        let text = try load(url)
+    public static func convert(_ url: URL, to target: ConvertTarget) async throws -> URL {
+        let text = try await load(url)
         let destination = UniqueDestination.url(
             in: OutputLocation.directory(beside: url),
             baseName: OutputLocation.baseName(url),

@@ -196,34 +196,51 @@ public enum PDFToolkit {
         return count > 1 ? [folder] : outputs
     }
 
-    public static func text(of url: URL) throws -> String {
-        try locked {
-            let document = try open(url)
-            let text = document.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !text.isEmpty { return text }
-            var pages: [String] = []
-            for index in 0..<document.pageCount {
-                guard let page = document.page(at: index), let image = pageImage(page, scale: 2) else { continue }
-                pages.append((try? TextRecognizer.text(in: image)) ?? "")
-            }
-            let recognized = pages.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            if recognized.isEmpty { throw OrangeError.nothingFound }
-            return recognized
-        }
+    public static func text(of url: URL, progress: ProgressHandler? = nil) async throws -> String {
+        let document = try locked { try open(url) }
+        _ = document
+        // Reuse the shared OCR path: native per-page text wins, scans get Apple OCR.
+        // Lock scope stays inside OCRDocumentSource; no lock is held across await.
+        let result = try await OCRService.shared.recognize(url: url, options: OCROptions.appleDefault, progress: progress)
+        let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { throw OrangeError.nothingFound }
+        return result.pages
+            .map { $0.content.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .joined(separator: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    public static func attributedText(of url: URL) throws -> NSAttributedString {
-        try locked {
-            let document = try open(url)
-            let output = NSMutableAttributedString()
-            for index in 0..<document.pageCount {
-                guard let page = document.page(at: index)?.attributedString, page.length > 0 else { continue }
-                if output.length > 0 { output.append(NSAttributedString(string: "\n\n")) }
-                output.append(page)
+    public static func attributedText(of url: URL, progress: ProgressHandler? = nil) async throws -> NSAttributedString {
+        let output = NSMutableAttributedString()
+        // Native rich text first, page by page (short lock each), scan pages via Apple OCR.
+        let count = try locked { try open(url).pageCount }
+        for index in 0..<count {
+            try Task.checkCancellation()
+            let native: NSAttributedString? = locked {
+                guard let page = try? open(url).page(at: index) else { return nil }
+                guard let attributed = page.attributedString, attributed.length > 0 else { return nil }
+                return attributed
             }
-            if output.length > 0 { return output }
-            return NSAttributedString(string: try text(of: url))
+            if let native, native.length > 0 {
+                if output.length > 0 { output.append(NSAttributedString(string: "\n\n")) }
+                output.append(native)
+                progress?(Double(index + 1) / Double(max(count, 1)))
+                continue
+            }
+            let source = OCRDocumentSource(url: url)
+            let image: CGImage
+            do {
+                image = try autoreleasepool { try source.renderImage(pageIndex: index) }
+            } catch {
+                throw OrangeError.toolFailed("\(url.lastPathComponent) p\(index + 1): \(error.localizedDescription)")
+            }
+            let content = try await AppleOCREngine().recognize(image, options: OCROptions.appleDefault)
+            if output.length > 0 { output.append(NSAttributedString(string: "\n\n")) }
+            output.append(NSAttributedString(string: content.text))
+            progress?(Double(index + 1) / Double(max(count, 1)))
         }
+        if output.length > 0 { return output }
+        throw OrangeError.nothingFound
     }
 
     // MARK: Building

@@ -6,9 +6,9 @@ public enum ConversionRouter {
         switch Catalog.kind(for: url) {
         case .image:
             if target == .txt {
-                let text = try TextRecognizer.text(in: ImageEngine.load(url, maxPixel: 4096))
-                guard !text.isEmpty else { throw OrangeError.nothingFound }
-                return [try writeText(text, beside: url)]
+                let result = try await OCRService.shared.recognize(url: url, options: OCROptions.appleDefault, progress: progress)
+                guard !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw OrangeError.nothingFound }
+                return [try writeText(result.text, beside: url)]
             }
             let request = ImageRequest(source: url, format: target, quality: quality, directory: directory)
             return [try ImageEngine.convert(request)]
@@ -21,12 +21,12 @@ public enum ConversionRouter {
             case .png, .jpeg, .heic, .tiff, .webp:
                 return try PDFToolkit.toImages(url: url, format: target, progress: progress)
             case .txt:
-                return [try writeText(PDFToolkit.text(of: url), beside: url)]
+                return [try writeText(try await PDFToolkit.text(of: url, progress: progress), beside: url)]
             default:
-                return [try DocumentConverter.convert(url, to: target)]
+                return [try await DocumentConverter.convert(url, to: target)]
             }
         case .document:
-            return [try DocumentConverter.convert(url, to: target)]
+            return [try await DocumentConverter.convert(url, to: target)]
         case .archive, .other:
             throw OrangeError.unsupported(url.pathExtension.uppercased())
         }
