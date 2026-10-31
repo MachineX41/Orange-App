@@ -87,13 +87,13 @@ struct WheelFace: View {
 
     var body: some View {
         ZStack {
-            GlassEffectContainer(spacing: 0) {
+            ZStack {
                 ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, _ in
                     let shape = WheelSegment(index: index, count: session.choices.count)
-                    Color.clear
+                    shape
+                        .fill(Color.primary.opacity(0.06))
                         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
-                        .glassEffect(.regular.interactive(), in: shape)
-                        .clipShape(shape)
+                        .glassEffect(.regular, in: shape)
                         .overlay {
                             shape
                                 .fill(OrangeTheme.accent)

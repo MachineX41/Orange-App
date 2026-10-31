@@ -50,17 +50,13 @@ struct ActivityStack: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 10) {
-            GlassEffectContainer(spacing: 10) {
-                VStack(alignment: .trailing, spacing: 10) {
-                    ForEach(runtime.running) { job in
-                        JobToast(job: job, progress: runtime.progress[job.id] ?? 0)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    ForEach(runtime.toasts) { toast in
-                        ResultToast(toast: toast)
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
-                    }
-                }
+            ForEach(runtime.running) { job in
+                JobToast(job: job, progress: runtime.progress[job.id] ?? 0)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            ForEach(runtime.toasts) { toast in
+                ResultToast(toast: toast)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
             Spacer(minLength: 0)
         }

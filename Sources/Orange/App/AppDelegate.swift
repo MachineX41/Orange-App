@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Consent.accepted { DragWatcher.shared.start() }
         NSApp.activate()
+        DispatchQueue.main.async { AppMover.offerIfNeeded() }
         #if DEBUG
         runDemoIfRequested()
         #endif
@@ -40,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 runtime.open(tool, files: files)
             case "select":
                 runtime.importURLs(urls)
+            case "toast":
+                runtime.toast(parts[1], urls.first?.lastPathComponent ?? "", symbol: "checkmark.circle.fill", style: .info)
             default:
                 break
             }

@@ -32,6 +32,8 @@ swiftc -O -framework AppKit -framework CoreGraphics \
   "$root/scripts/RenderIcon.swift" -o "$root/build/render-icon"
 "$root/build/render-icon" "$root/build/AppIcon.iconset" "$root/Configuration/AppIcon.png"
 iconutil -c icns "$root/build/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
-codesign --force --deep --sign - "$app" >/dev/null
+# Ad-hoc signatures default to a hash-based requirement, so macOS would forget folder permissions after every update.
+codesign --force --deep --sign - --identifier app.orange.studio \
+  --requirements '=designated => identifier "app.orange.studio"' "$app" >/dev/null
 
 echo "Built $app"
