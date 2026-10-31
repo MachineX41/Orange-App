@@ -92,10 +92,15 @@ struct JobRecord: Identifiable, Codable, Equatable, Sendable {
     var outputPaths: [String]
 }
 
+enum SettingsTab: String, CaseIterable, Sendable {
+    case general, wheel, privacy, models
+}
+
 enum AppSection: Hashable, Identifiable {
     case home
     case library
     case download
+    case ocr
     case shelf
     case tools(MediaKind)
 
@@ -104,6 +109,7 @@ enum AppSection: Hashable, Identifiable {
         case .home: "home"
         case .library: "library"
         case .download: "download"
+        case .ocr: "ocr"
         case .shelf: "shelf"
         case .tools(let kind): "tools-\(kind.rawValue)"
         }

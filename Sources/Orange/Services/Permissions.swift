@@ -130,7 +130,7 @@ final class Permissions {
 
 /// What the user agreed to, versioned so a changed policy can be shown again.
 enum Consent {
-    static let currentVersion = 1
+    static let currentVersion = 2
     static let privacyURL = URL(string: "https://github.com/MachineX41/Orange-App/blob/main/PRIVACY.md")!
     static let termsURL = URL(string: "https://github.com/MachineX41/Orange-App/blob/main/TERMS.md")!
 

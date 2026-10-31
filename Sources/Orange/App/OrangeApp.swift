@@ -42,6 +42,7 @@ struct OrangeApp: App {
                 Button(L("Download", "İndir")) { runtime.section = .download }.keyboardShortcut("2")
                 Button(L("Library", "Kitaplık")) { runtime.section = .library }.keyboardShortcut("3")
                 Button(L("Shelf", "Raf")) { runtime.section = .shelf }.keyboardShortcut("4")
+                Button(L("Text (OCR)", "Metin (OCR)")) { runtime.section = .ocr }.keyboardShortcut("9")
                 Divider()
                 ForEach(Array(MediaKind.toolKinds.enumerated()), id: \.element) { index, kind in
                     Button(kind.title) { runtime.section = .tools(kind) }

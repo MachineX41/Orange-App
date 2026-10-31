@@ -1,6 +1,8 @@
 import CoreGraphics
 import Foundation
-
+#if canImport(Metal)
+import Metal
+#endif
 /// Coordinates OCR across images and PDFs. Serializes access to the shared
 /// native helper through a process-wide FIFO lease so two recognize calls can
 /// never enter the same helper concurrently. Pending work holds URLs and
@@ -9,6 +11,7 @@ public actor OCRService {
     public static let shared = OCRService()
 
     private var engine: any OCREngine
+    private var nativeEngine: (any OCREngine)?
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var occupied = false
     private let defaultMaxSide: CGFloat = 4096
@@ -23,6 +26,10 @@ public actor OCRService {
         _ = temporaryRoot
     }
 
+    public func configureNative(engine: any OCREngine) {
+        nativeEngine = engine
+    }
+
     public func recognize(
         url: URL,
         options: OCROptions,
@@ -30,6 +37,7 @@ public actor OCRService {
         progress: ProgressHandler? = nil
     ) async throws -> OCRDocumentResult {
         try Task.checkCancellation()
+        try checkMemory(for: options)
         await acquire()
         defer { release() }
         let source = OCRDocumentSource(url: url)
@@ -63,15 +71,48 @@ public actor OCRService {
             let content = OCRPageContent(text: text, actualCompute: .appleManaged)
             return OCRPageResult(sourceURL: source.url, pageIndex: pageIndex, content: content, embeddedTextUsed: true)
         case .image(let image):
+            let active = (options.modelID == .appleVision) ? engine : (nativeEngine ?? engine)
             let content: OCRPageContent
             do {
-                content = try await engine.recognize(image, options: options)
+                content = try await active.recognize(image, options: options)
             } catch {
                 if error is CancellationError || (error as? OrangeError) == .cancelled { throw error }
                 throw pageError(source: source, pageIndex: pageIndex, underlying: error)
             }
             return OCRPageResult(sourceURL: source.url, pageIndex: pageIndex, content: content)
         }
+    }
+
+    /// Preflight memory gate: estimated working set vs half of physical RAM.
+    /// Throws before any bitmap is rendered; the UI turns this into the
+    /// explicit memory-confirmation prompt, never a silent downgrade.
+    private func checkMemory(for options: OCROptions) throws {
+        guard options.modelID != .appleVision,
+              let entry = OCRModelCatalog.entry(for: options.modelID)
+        else { return }
+        let physical = ProcessInfo.processInfo.physicalMemory
+        guard physical > 0 else { return }
+        if entry.estimatedWorkingSetBytes > Int64(physical / 2) {
+            throw OrangeError.toolFailed(
+                "\(entry.displayName) needs ~\(entry.estimatedWorkingSetBytes / 1_000_000_000) GB but this Mac has \(physical / 1_000_000_000) GB RAM."
+            )
+        }
+        if options.compute != .cpu, let metalBytes = metalRecommendedMax() {
+            if entry.estimatedWorkingSetBytes > Int64(Double(metalBytes) * 0.8) {
+                throw OrangeError.toolFailed(
+                    "\(entry.displayName) exceeds 80% of the Metal budget on this Mac."
+                )
+            }
+        }
+    }
+
+    private func metalRecommendedMax() -> UInt64? {
+        #if canImport(Metal)
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        return device.recommendedMaxWorkingSetSize
+        #else
+        return nil
+        #endif
     }
 
     private func pageError(source: OCRDocumentSource, pageIndex: Int, underlying: Error) -> Error {

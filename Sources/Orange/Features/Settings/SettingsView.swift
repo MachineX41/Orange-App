@@ -7,7 +7,7 @@ struct SettingsView: View {
 
     var body: some View {
         @Bindable var runtime = runtime
-        TabView {
+        TabView(selection: $runtime.settingsTab) {
             Form {
                 Section(L("Appearance", "Görünüm")) {
                     Picker(L("Theme", "Tema"), selection: $runtime.appearance) {
@@ -46,8 +46,8 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            .tag(SettingsTab.general)
             .tabItem { Label(L("General", "Genel"), systemImage: "gearshape") }
-
             Form {
                 Section(L("Drag wheel", "Sürükleme çarkı")) {
                     Toggle(L("Show the wheel while dragging files", "Dosya sürüklerken çarkı göster"), isOn: $runtime.wheelEnabled)
@@ -68,13 +68,19 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            .tag(SettingsTab.wheel)
             .tabItem { Label(L("Wheel", "Çark"), systemImage: "circle.circle") }
 
             PrivacySettings()
+                .tag(SettingsTab.privacy)
                 .tabItem { Label(L("Privacy", "Gizlilik"), systemImage: "hand.raised") }
+
+            OCRModelsView()
+                .tag(SettingsTab.models)
+                .tabItem { Label(L("Models", "Modeller"), systemImage: "cpu") }
         }
         .tint(OrangeTheme.accent)
-        .frame(width: 600, height: 540)
+        .frame(width: 720, height: 620)
     }
 
     private func description(_ mode: WheelMode) -> String {

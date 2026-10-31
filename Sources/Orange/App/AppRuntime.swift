@@ -39,8 +39,13 @@ final class AppRuntime {
     var wheelEnabled: Bool { didSet { save() } }
     var showInMenuBar: Bool { didSet { save() } }
     var imageQuality: Double { didSet { save() } }
-    var showShortcuts = false
-    var showOnboarding = !(UserDefaults.standard.bool(forKey: "onboardingDone") && Consent.accepted)
+    var ocrDefaultModelID: String { didSet { save() } }
+    var ocrComputePreference: String { didSet { save() } }
+    var ocrQuality: String { didSet { save() } }
+    var ocrLanguageIdentifiers: [String] { didSet { save() } }
+    var ocrMode: String { didSet { save() } }
+    var settingsTab: SettingsTab = .general
+    let ocrWorkspace = OCRWorkspaceModel()
     var customOutputPath: String? {
         didSet {
             OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -77,6 +82,11 @@ final class AppRuntime {
         wheelEnabled = defaults.object(forKey: "wheelEnabled") as? Bool ?? true
         showInMenuBar = defaults.object(forKey: "showInMenuBar") as? Bool ?? true
         imageQuality = defaults.object(forKey: "imageQuality") as? Double ?? 0.88
+        ocrDefaultModelID = defaults.string(forKey: "ocrDefaultModelID") ?? OCRModelID.appleVision.rawValue
+        ocrComputePreference = defaults.string(forKey: "ocrComputePreference") ?? OCRComputePreference.automatic.rawValue
+        ocrQuality = defaults.string(forKey: "ocrQuality") ?? OCRQuality.balanced.rawValue
+        ocrLanguageIdentifiers = defaults.stringArray(forKey: "ocrLanguageIdentifiers") ?? []
+        ocrMode = defaults.string(forKey: "ocrMode") ?? OCRMode.text.rawValue
         customOutputPath = defaults.string(forKey: "customOutputPath")
         OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
 
@@ -91,16 +101,19 @@ final class AppRuntime {
         shelf = snapshot.shelf.compactMap { FileRef.load(URL(fileURLWithPath: $0)) }
         loading = false
     }
-
     private func save() {
         guard !loading else { return }
-        defaults.set(appearance.rawValue, forKey: "appearance")
         defaults.set(revealWhenDone, forKey: "revealWhenDone")
         defaults.set(soundOnDone, forKey: "soundOnDone")
         defaults.set(hapticOnWheel, forKey: "hapticOnWheel")
         defaults.set(wheelEnabled, forKey: "wheelEnabled")
         defaults.set(showInMenuBar, forKey: "showInMenuBar")
         defaults.set(imageQuality, forKey: "imageQuality")
+        defaults.set(ocrDefaultModelID, forKey: "ocrDefaultModelID")
+        defaults.set(ocrComputePreference, forKey: "ocrComputePreference")
+        defaults.set(ocrQuality, forKey: "ocrQuality")
+        defaults.set(ocrLanguageIdentifiers, forKey: "ocrLanguageIdentifiers")
+        defaults.set(ocrMode, forKey: "ocrMode")
         defaults.set(customOutputPath, forKey: "customOutputPath")
     }
 
@@ -111,6 +124,15 @@ final class AppRuntime {
     // MARK: Selection
 
     func importURLs(_ urls: [URL]) {
+        if section == .ocr {
+            let supported = urls.filter { [.image, .pdf].contains(Catalog.kind(for: $0)) }
+            guard !supported.isEmpty else {
+                toast(L("Text (OCR)", "Metin (OCR)"), L("Only images and PDFs can be used here.", "Burada yalnızca görsel ve PDF kullanılabilir."), symbol: "text.viewfinder", style: .info)
+                return
+            }
+            ocrWorkspace.add(urls: supported)
+            return
+        }
         let files = urls.compactMap(FileRef.load)
         guard !files.isEmpty else { return }
         var merged = selection
@@ -260,6 +282,11 @@ final class AppRuntime {
         }
         let urls = usable.map(\.url)
         switch tool {
+        case .recognizeText:
+            ocrWorkspace.add(urls: urls)
+            section = .ocr
+            showMainWindow()
+            return
         case .removeBackground:
             runEach(urls, title: tool.title, symbol: tool.symbol) { url, _ in
                 let cutout = try BackgroundRemover.cutout(ImageEngine.load(url))
