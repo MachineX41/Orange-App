@@ -22,7 +22,7 @@ chmod +x "$app/Contents/MacOS/Orange"
 
 swiftc -O -framework AppKit -framework CoreGraphics \
   "$root/scripts/RenderIcon.swift" -o "$root/build/render-icon"
-"$root/build/render-icon" "$root/build/AppIcon.iconset"
+"$root/build/render-icon" "$root/build/AppIcon.iconset" "$root/Configuration/AppIcon.png"
 iconutil -c icns "$root/build/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$app" >/dev/null
 
