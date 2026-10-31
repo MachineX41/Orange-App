@@ -35,7 +35,7 @@ extension Color {
     }
 }
 
-/// Quiet, mostly neutral mesh behind every window. Orange is only a faint glow so glass stays readable.
+/// Warm stone mesh behind every window. Dark enough that glass reads as a surface, without an orange wash.
 struct OrangeBackdrop: View {
     @Environment(\.colorScheme) private var scheme
     var intensity: Double = 1
@@ -69,9 +69,9 @@ struct OrangeBackdrop: View {
             ]
         }
         return [
-            Color(hex: 0xF7F6F4), Color(hex: 0xF6F3EF), Color(hex: 0xF3F2F2),
-            Color(hex: 0xF5F1EC), Color(hex: 0xFBE6D4), Color(hex: 0xF2F0F1),
-            Color(hex: 0xF1F0EE), Color(hex: 0xF3EFEC), Color(hex: 0xEFEEF1)
+            Color(hex: 0xE3DED6), Color(hex: 0xE0DAD1), Color(hex: 0xDCD7D0),
+            Color(hex: 0xE1DBD2), Color(hex: 0xE6D3C0), Color(hex: 0xD8D3CC),
+            Color(hex: 0xD6D1CA), Color(hex: 0xDAD4CC), Color(hex: 0xD2CDC6)
         ]
     }
 }

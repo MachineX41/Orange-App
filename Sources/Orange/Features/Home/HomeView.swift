@@ -33,6 +33,7 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.automatic)
+        .scrollContentBackground(.hidden)
     }
 }
 

@@ -65,5 +65,6 @@ struct ToolsView: View {
             .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
         }
+        .scrollContentBackground(.hidden)
     }
 }

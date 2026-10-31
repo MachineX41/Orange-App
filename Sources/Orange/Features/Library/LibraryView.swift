@@ -34,6 +34,7 @@ struct LibraryView: View {
                     }
                     .padding(2)
                 }
+                .scrollContentBackground(.hidden)
             }
         }
         .padding(28)
@@ -133,6 +134,7 @@ struct ShelfView: View {
                     }
                     .padding(2)
                 }
+                .scrollContentBackground(.hidden)
             }
         }
         .padding(28)

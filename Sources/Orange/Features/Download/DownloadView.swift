@@ -87,6 +87,7 @@ struct DownloadView: View {
             .frame(maxWidth: 1000)
             .frame(maxWidth: .infinity)
         }
+        .scrollContentBackground(.hidden)
     }
 
     private func start() {

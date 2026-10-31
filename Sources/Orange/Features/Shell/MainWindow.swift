@@ -27,7 +27,7 @@ struct MainWindow: View {
             .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 260)
         } detail: {
             ZStack {
-                OrangeBackdrop(intensity: 0.6)
+                OrangeBackdrop()
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(runtime.section)
