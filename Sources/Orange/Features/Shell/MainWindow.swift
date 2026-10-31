@@ -74,6 +74,13 @@ struct MainWindow: View {
             }
         }
         .sheet(isPresented: $runtime.showShortcuts) { ShortcutsSheet() }
+        .background {
+            Color.clear
+                .sheet(isPresented: $runtime.showOnboarding) {
+                    OnboardingView { runtime.finishOnboarding() }
+                        .environment(runtime)
+                }
+        }
         .animation(.easeOut(duration: 0.22), value: runtime.section)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: runtime.localWheel)
         .onAppear { runtime.openWindowAction = openWindow }
@@ -106,10 +113,15 @@ struct SidebarItem: View {
         Button {
             runtime.section = section
         } label: {
-            HStack(spacing: 6) {
-                Label(title, systemImage: symbol)
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
                     .symbolRenderingMode(.monochrome)
+                    .font(.system(size: 13.5, weight: .regular))
+                    .foregroundStyle(selected ? Color.white : OrangeTheme.accent)
+                    .frame(width: 20)
+                Text(title)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .lineLimit(1)
                 Spacer(minLength: 4)
                 if badge > 0 {
                     Text("\(badge)")

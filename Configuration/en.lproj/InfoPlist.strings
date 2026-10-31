@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "Orange";
+"NSDesktopFolderUsageDescription" = "Orange saves converted and edited copies next to the files you choose on your Desktop. Files are processed on this Mac and never uploaded.";
+"NSDocumentsFolderUsageDescription" = "Orange saves converted and edited copies next to the files you choose in Documents. Files are processed on this Mac and never uploaded.";
+"NSDownloadsFolderUsageDescription" = "Orange saves link downloads and results to your Downloads folder. Files are processed on this Mac and never uploaded.";
+"NSRemovableVolumesUsageDescription" = "Orange saves results next to files you choose on external drives.";
+"NSNetworkVolumesUsageDescription" = "Orange saves results next to files you choose on network drives.";

@@ -40,6 +40,7 @@ final class AppRuntime {
     var showInMenuBar: Bool { didSet { save() } }
     var imageQuality: Double { didSet { save() } }
     var showShortcuts = false
+    var showOnboarding = !(UserDefaults.standard.bool(forKey: "onboardingDone") && Consent.accepted)
     var customOutputPath: String? {
         didSet {
             OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -166,6 +167,17 @@ final class AppRuntime {
     }
 
     @ObservationIgnored var openWindowAction: OpenWindowAction?
+
+    func finishOnboarding() {
+        defaults.set(true, forKey: "onboardingDone")
+        showOnboarding = false
+        DragWatcher.shared.start()
+    }
+
+    func replayOnboarding() {
+        showMainWindow()
+        showOnboarding = true
+    }
 
     func showMainWindow() {
         NSApp.activate()

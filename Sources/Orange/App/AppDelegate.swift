@@ -4,11 +4,18 @@ import OrangeKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        DragWatcher.shared.start()
+        if Consent.accepted { DragWatcher.shared.start() }
         NSApp.activate()
         #if DEBUG
         runDemoIfRequested()
         #endif
+    }
+
+    /// The system Settings item's key changes with the macOS language (⌘Ö in Turkish), so it is read rather than assumed.
+    static var settingsKey: String {
+        let items = NSApp.mainMenu?.items.first?.submenu?.items ?? []
+        let key = items.prefix { $0.submenu == nil }.first { !$0.keyEquivalent.isEmpty }?.keyEquivalent ?? ""
+        return key.isEmpty ? "," : key.uppercased()
     }
 
     #if DEBUG

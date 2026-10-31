@@ -55,7 +55,12 @@ struct OrangeApp: App {
                     runtime.showMainWindow()
                     runtime.showShortcuts = true
                 }
-                .keyboardShortcut("/")
+                .keyboardShortcut("/", modifiers: .command, localization: .custom)
+                Button(L("Show Welcome Tour", "Tanıtımı Göster")) { runtime.replayOnboarding() }
+                Divider()
+                Link(L("Privacy Notice", "Gizlilik Bildirimi"), destination: Consent.privacyURL)
+                Link(L("Terms of Use", "Kullanım Koşulları"), destination: Consent.termsURL)
+                Link(L("Orange on GitHub", "GitHub’da Orange"), destination: URL(string: "https://github.com/MachineX41/Orange-App")!)
             }
         }
 

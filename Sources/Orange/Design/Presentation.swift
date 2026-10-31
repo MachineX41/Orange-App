@@ -110,7 +110,12 @@ extension ToolID {
     var windowTitle: String {
         switch self {
         case .adjustImage: L("Edit Photo", "Fotoğrafı Düzenle")
-        case .cropImage, .rotateImage: L("Crop & Rotate", "Kırp ve Döndür")
+        case .cropImage: L("Crop & Rotate", "Kırp ve Döndür")
+        case .rotateImage: L("Rotate & Mirror", "Döndür ve Aynala")
+        case .imagesToPDF: L("Images to PDF", "Görsellerden PDF")
+        case .compressPDF: L("Compress PDF", "PDF’yi Sıkıştır")
+        case .muteVideo: L("Remove Audio", "Sesi Kaldır")
+        case .unzip: L("Extract Archive", "Arşivi Aç")
         case .compressImage: L("Compress Images", "Görselleri Sıkıştır")
         case .annotateImage: L("Annotate", "İşaretle")
         case .redactImage: L("Redact Image", "Görseli Gizle")
@@ -135,7 +140,7 @@ extension ToolID {
         case .bleepAudio: L("Bleep Audio", "Sese Bip Ekle")
         case .audioToVideo: L("Audio to Video", "Sesten Videoya")
         case .metadata: L("Metadata", "Meta Veri")
-        case .readQR: L("Codes Found", "Bulunan Kodlar")
+        case .readQR: L("Read QR & Barcodes", "QR ve Barkod Oku")
         default: title
         }
     }

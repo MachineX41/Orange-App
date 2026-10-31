@@ -31,7 +31,7 @@ public enum LinkDownloader {
             return try await runDownloader(tool, url: url, audioOnly: audioOnly, into: directory, progress: progress)
         }
         if let media = try await discoverMedia(in: url) {
-            return [try await fetch(media, into: directory, progress: progress)]
+            return [try await fetch(media, into: directory, progress: progress, rejectPages: true)]
         }
         throw OrangeError.needsDownloader
     }
@@ -40,12 +40,16 @@ public enum LinkDownloader {
 
     static let agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
-    static func fetch(_ url: URL, into directory: URL, progress: ProgressHandler?) async throws -> URL {
+    static func fetch(_ url: URL, into directory: URL, progress: ProgressHandler?, rejectPages: Bool = false) async throws -> URL {
         var request = URLRequest(url: url)
         request.setValue(agent, forHTTPHeaderField: "User-Agent")
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw OrangeError.badLink
+        }
+        // A discovered "video" link that is really an embed page needs yt-dlp, not a saved .html file.
+        if rejectPages, isPage(mimeType: http.mimeType) {
+            throw OrangeError.needsDownloader
         }
         let expected = response.expectedContentLength
         let suggested = response.suggestedFilename ?? url.lastPathComponent
@@ -78,6 +82,11 @@ public enum LinkDownloader {
         }
         progress?(1)
         return destination
+    }
+
+    public static func isPage(mimeType: String?) -> Bool {
+        guard let type = mimeType?.lowercased() else { return false }
+        return type.hasPrefix("text/") || type.contains("html") || type.contains("xml") || type.contains("json")
     }
 
     /// Looks for Open Graph / Twitter video or image tags and `<video src>`.

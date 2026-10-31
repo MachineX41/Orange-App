@@ -24,7 +24,7 @@ struct ShortcutsSheet: View {
                 Item(keys: ["⌘", "O"], title: L("Open files", "Dosya aç")),
                 Item(keys: ["⌘", "⌫"], title: L("Clear selection", "Seçimi temizle")),
                 Item(keys: ["⇧", "⌘", "L"], title: L("Floating shelf", "Yüzen raf")),
-                Item(keys: ["⌘", ","], title: L("Settings", "Ayarlar")),
+                Item(keys: ["⌘", AppDelegate.settingsKey], title: L("Settings", "Ayarlar")),
                 Item(keys: ["⌘", "/"], title: L("Keyboard shortcuts", "Klavye kısayolları"))
             ]),
             Group(title: L("Navigate", "Gezinme"), symbol: "sidebar.left", items: [

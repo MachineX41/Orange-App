@@ -37,7 +37,7 @@ struct DownloadView: View {
                         }
                         .pickerStyle(.segmented)
                         .labelsHidden()
-                        .frame(width: 220)
+                        .fixedSize()
                         Button(L("Paste", "Yapıştır")) {
                             if let text = NSPasteboard.general.string(forType: .string) { link = text }
                         }
@@ -70,6 +70,13 @@ struct DownloadView: View {
                     }
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.shield")
+                        Text(L("Only download content you own or have permission to save, and follow each site’s terms and copyright law.", "Yalnızca size ait ya da kaydetme izniniz olan içerikleri indirin; sitenin kullanım koşullarına ve telif hakkı yasalarına uyun."))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.tertiary)
                 }
                 .padding(22)
                 .glassCard(radius: 26)

@@ -69,8 +69,12 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .tabItem { Label(L("Wheel", "Çark"), systemImage: "circle.circle") }
+
+            PrivacySettings()
+                .tabItem { Label(L("Privacy", "Gizlilik"), systemImage: "hand.raised") }
         }
-        .frame(width: 560, height: 440)
+        .tint(OrangeTheme.accent)
+        .frame(width: 600, height: 540)
     }
 
     private func description(_ mode: WheelMode) -> String {
@@ -89,6 +93,65 @@ struct SettingsView: View {
         panel.prompt = L("Use Folder", "Klasörü Kullan")
         if panel.runModal() == .OK, let url = panel.url {
             runtime.customOutputPath = url.path
+        }
+    }
+}
+
+struct PrivacySettings: View {
+    @Environment(AppRuntime.self) private var runtime
+    @State private var permissions = Permissions.shared
+    @State private var confirmClear = false
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ProtectedFolder.allCases) { folder in
+                    FolderRow(folder: folder)
+                        .padding(.horizontal, -16)
+                }
+            } header: {
+                Text(L("Folder access", "Klasör erişimi"))
+            } footer: {
+                Text(L("macOS shows its own prompt the first time. Declined folders can be turned on in System Settings › Privacy & Security › Files & Folders.", "macOS ilk seferde kendi onay penceresini gösterir. Reddedilen klasörler Sistem Ayarları › Gizlilik ve Güvenlik › Dosyalar ve Klasörler’den açılabilir."))
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(L("Startup", "Başlangıç")) {
+                Toggle(L("Open Orange at login", "Orange’ı girişte aç"), isOn: Binding(get: { permissions.opensAtLogin }, set: { permissions.setOpensAtLogin($0) }))
+                if permissions.loginItem == .requiresApproval {
+                    Text(L("Approve Orange under System Settings › General › Login Items.", "Sistem Ayarları › Genel › Giriş Öğeleri’nden Orange’ı onaylayın."))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                if let error = permissions.loginItemError {
+                    Text(error).font(.callout).foregroundStyle(OrangeTheme.ember)
+                }
+            }
+
+            Section(L("Your data", "Verileriniz")) {
+                LabeledContent(L("Processing", "İşleme"), value: L("On this Mac only", "Yalnızca bu Mac’te"))
+                LabeledContent(L("Analytics and tracking", "Analiz ve takip"), value: L("None", "Yok"))
+                if let date = Consent.acceptedAt {
+                    LabeledContent(L("Terms accepted", "Koşullar kabul edildi"), value: date.formatted(date: .abbreviated, time: .shortened))
+                }
+                HStack {
+                    Link(L("Privacy Notice", "Gizlilik Bildirimi"), destination: Consent.privacyURL)
+                    Link(L("Terms of Use", "Kullanım Koşulları"), destination: Consent.termsURL)
+                    Spacer()
+                    Button(L("Clear History and Shelf…", "Geçmişi ve Rafı Temizle…")) { confirmClear = true }
+                }
+                Button(L("Show Welcome Tour", "Tanıtımı Göster")) { runtime.replayOnboarding() }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { permissions.refreshLoginItem() }
+        .confirmationDialog(L("Clear history and shelf?", "Geçmiş ve raf temizlensin mi?"), isPresented: $confirmClear) {
+            Button(L("Clear", "Temizle"), role: .destructive) {
+                runtime.clearHistory()
+                runtime.clearShelf()
+            }
+        } message: {
+            Text(L("Your files stay where they are. Only Orange’s list of them is removed.", "Dosyalarınız yerinde kalır. Yalnızca Orange’ın onlara ait listesi silinir."))
         }
     }
 }
@@ -140,7 +203,6 @@ struct MenuBarView: View {
             runtime.showShortcuts = true
         }
         SettingsLink { Text(L("Settings…", "Ayarlar…")) }
-            .keyboardShortcut(",")
         Button(L("Hide from Menu Bar", "Menü Çubuğundan Gizle")) { runtime.showInMenuBar = false }
         Button(L("Quit Orange", "Orange’dan Çık")) { NSApp.terminate(nil) }
             .keyboardShortcut("q")

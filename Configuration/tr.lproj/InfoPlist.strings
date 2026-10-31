@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "Orange";
+"NSDesktopFolderUsageDescription" = "Orange, Masaüstü’nde seçtiğiniz dosyaların dönüştürülmüş ve düzenlenmiş kopyalarını yanlarına kaydeder. Dosyalar bu Mac’te işlenir, hiçbir yere yüklenmez.";
+"NSDocumentsFolderUsageDescription" = "Orange, Belgeler’de seçtiğiniz dosyaların dönüştürülmüş ve düzenlenmiş kopyalarını yanlarına kaydeder. Dosyalar bu Mac’te işlenir, hiçbir yere yüklenmez.";
+"NSDownloadsFolderUsageDescription" = "Orange, link indirmelerini ve sonuçları İndirilenler klasörüne kaydeder. Dosyalar bu Mac’te işlenir, hiçbir yere yüklenmez.";
+"NSRemovableVolumesUsageDescription" = "Orange, harici disklerde seçtiğiniz dosyaların sonuçlarını yanlarına kaydeder.";
+"NSNetworkVolumesUsageDescription" = "Orange, ağ disklerinde seçtiğiniz dosyaların sonuçlarını yanlarına kaydeder.";

@@ -10,6 +10,8 @@
 	<string>Orange</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>NSAccentColorName</key>
+	<string>AccentColor</string>
 	<key>CFBundleIdentifier</key>
 	<string>app.orange.studio</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -58,5 +60,15 @@
 	<string>© 2026 Orange</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Orange saves converted and edited copies next to the files you choose on your Desktop. Files are processed on this Mac and never uploaded.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Orange saves converted and edited copies next to the files you choose in Documents. Files are processed on this Mac and never uploaded.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Orange saves link downloads and results to your Downloads folder. Files are processed on this Mac and never uploaded.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Orange saves results next to files you choose on external drives.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Orange saves results next to files you choose on network drives.</string>
 </dict>
 </plist>
