@@ -3,6 +3,7 @@ import CoreGraphics
 import CoreText
 import Foundation
 import PDFKit
+import Vision
 import XCTest
 @testable import OrangeKit
 
@@ -14,8 +15,8 @@ enum OCRFixtures {
         try ImageEngine.render(width: Int(size.width), height: Int(size.height)) { context in
             context.setFillColor(CGColor(gray: 1, alpha: 1))
             context.fill(CGRect(origin: .zero, size: size))
-            context.translateBy(x: 0, y: size.height)
-            context.scaleBy(x: 1, y: -1)
+            // CGContext origin is bottom-left; Core Text draws from the
+            // baseline upward, so no flip is needed — just position above bottom.
             let font = CTFontCreateWithName("Helvetica-Bold" as CFString, 72, nil)
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
@@ -24,7 +25,7 @@ enum OCRFixtures {
             let attributed = NSAttributedString(string: string, attributes: attributes)
             let line = CTLineCreateWithAttributedString(attributed)
             let bounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-            context.textPosition = CGPoint(x: 60, y: (size.height - bounds.height) / 2)
+            context.textPosition = CGPoint(x: 60, y: (size.height - bounds.height) / 2 - bounds.minY)
             CTLineDraw(line, context)
         }
     }
@@ -38,7 +39,7 @@ enum OCRFixtures {
 
     static func savePNG(_ image: CGImage, to directory: URL, name: String) throws -> URL {
         let url = directory.appendingPathComponent(name)
-        try ImageEngine.write(image, to: url, as: .png)
+        try ImageEngine.write(image, to: url, as: .png, quality: 1.0)
         return url
     }
 
@@ -46,19 +47,34 @@ enum OCRFixtures {
     /// page3 blank, page4 native "Native Omega".
     static func mixedPDF(in directory: URL) throws -> URL {
         let url = directory.appendingPathComponent("mixed.pdf")
-        let document = PDFDocument()
-        let page1 = PDFPage(attributedString: NSAttributedString(string: "Native Alpha"))
-        document.insert(page1!, at: 0)
-        let scanned = try savePNG(textImage("Scanned Beta"), to: directory, name: "scanned.png")
-        guard let scannedPage = PDFPage(image: NSImage(contentsOf: scanned)!) else {
-            throw OrangeError.writeFailed("scanned")
+        var pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let context = CGContext(url as CFURL, mediaBox: &pageRect, nil) else {
+            throw OrangeError.writeFailed("mixed.pdf")
         }
-        document.insert(scannedPage, at: 1)
-        let blank = PDFPage(attributedString: NSAttributedString(string: ""))
-        document.insert(blank!, at: 2)
-        let page4 = PDFPage(attributedString: NSAttributedString(string: "Native Omega"))
-        document.insert(page4!, at: 3)
-        guard document.write(to: url) else { throw OrangeError.writeFailed("mixed.pdf") }
+        let font = CTFontCreateWithName("Helvetica" as CFString, 48, nil)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        func nativePage(_ string: String) {
+            context.beginPDFPage(nil)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(pageRect)
+            context.textPosition = CGPoint(x: 72, y: 400)
+            CTLineDraw(CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes)), context)
+            context.endPDFPage()
+        }
+        nativePage("Native Alpha")
+        // Raster page: draw the scanned text as an image, no text layer.
+        let scanned = try textImage("Scanned Beta")
+        context.beginPDFPage(nil)
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(pageRect)
+        context.draw(scanned, in: CGRect(x: 72, y: 300, width: 468, height: 156))
+        context.endPDFPage()
+        context.beginPDFPage(nil) // blank
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(pageRect)
+        context.endPDFPage()
+        nativePage("Native Omega")
+        context.closePDF()
         return url
     }
 }
@@ -210,6 +226,7 @@ final class AppleOCRTests: XCTestCase {
 
 // MARK: - Downloader contract tests (no network: pure resume decisions + local files)
 
+@MainActor
 final class OCRDownloaderTests: XCTestCase {
     func testResume200Restarts() {
         XCTAssertEqual(

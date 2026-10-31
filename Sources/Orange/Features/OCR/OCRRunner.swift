@@ -81,7 +81,6 @@ final class OCRRunner {
         await MainActor.run { [weak self] in
             guard let self, model.runID == runID else { return }
             model.finishRun()
-            trimThumbnails()
         }
     }
 
@@ -113,22 +112,6 @@ final class OCRRunner {
         case .metal: "Metal"
         case .cpu: "CPU"
         case .metalTextCPUProjector: "Metal + CPU"
-        }
-    }
-
-    private func maybeRenderThumbs(for index: Int) {
-        // Render the selected preview up to 160px lazily; thumbnails for the
-        // rail stay bounded — enforce the 6-item cap after every update.
-        trimThumbnails()
-    }
-
-    private func trimThumbnails() {
-        var kept = 0
-        for index in model.pages.indices {
-            if model.pages[index].thumbnail != nil {
-                kept += 1
-                if kept > 6 { model.pages[index].thumbnail = nil }
-            }
         }
     }
 

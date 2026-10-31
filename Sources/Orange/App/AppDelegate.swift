@@ -8,17 +8,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         let runtime = AppRuntime.shared
         hidesLaunchWindow = runtime.showInMenuBar && !runtime.showOnboarding
-        NotificationCenter.default.addObserver(self, selector: #selector(windowVisibilityChanged),
-                                               name: NSWindow.didBecomeVisibleNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(windowVisibilityChanged),
-                                               name: NSWindow.willCloseNotification, object: nil)
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didChangeOcclusionStateNotification,
+                     NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
+                     NSWindow.willCloseNotification] {
+            center.addObserver(self, selector: #selector(windowVisibilityChanged), name: name, object: nil)
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Consent.accepted { DragWatcher.shared.start() }
 
         if hidesLaunchWindow {
-            // Pencere bu anda görünürse hemen gizle; değilse didBecomeVisible yakalayacak.
+            // Pencere bu anda görünürse hemen gizle; değilse didBecomeKey yakalayacak.
             hidesLaunchWindow = !hideVisibleMainWindows()
             AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar)
         } else {
@@ -44,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func windowVisibilityChanged(_ notification: Notification) {
         if hidesLaunchWindow,
-           notification.name == NSWindow.didBecomeVisibleNotification,
+           notification.name == NSWindow.didBecomeKeyNotification,
            let window = notification.object as? NSWindow,
            window.identifier?.rawValue.hasPrefix("main") == true {
             window.orderOut(nil)

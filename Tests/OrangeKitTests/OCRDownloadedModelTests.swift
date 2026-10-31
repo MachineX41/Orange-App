@@ -12,6 +12,7 @@ import XCTest
 final class OCRDownloadedModelTests: XCTestCase {
     private var helperURL: URL?
     private var store: OCRModelStore?
+    private var modelRoot: URL?
     private var enabled = false
 
     override func setUpWithError() throws {
@@ -31,19 +32,30 @@ final class OCRDownloadedModelTests: XCTestCase {
         guard FileManager.default.isExecutableFile(atPath: helper.path) else { return }
         helperURL = helper
         store = OCRModelStore(root: root)
+        modelRoot = root
         enabled = true
     }
 
     private func require(entry: OCRModelEntry, file: StaticString = #file, line: UInt = #line) throws -> (URL, OCRModelStore) {
-        guard enabled, let store, let helperURL else {
+        guard enabled, let store, let helperURL, let modelRoot else {
             throw XCTSkip("ORANGE_OCR_MODEL_TESTS=1 and an installed model pair are required.")
         }
-        let status = store.statusSyncForTests(entry: entry)
-        guard status == .installed else {
+        guard isInstalled(entry: entry, root: modelRoot) else {
             throw XCTSkip("\(entry.displayName) is not installed; install it from Settings › Models first.")
         }
         _ = helperURL
         return (helperURL, store)
+    }
+
+    /// Synchronous status probe for the skip logic; reads only the verified manifest.
+    private func isInstalled(entry: OCRModelEntry, root: URL) -> Bool {
+        let manifestURL = root.appendingPathComponent("\(entry.id.rawValue)/\(entry.revision)", isDirectory: true)
+            .appendingPathComponent("verified.json")
+        guard let data = try? Data(contentsOf: manifestURL),
+              let manifest = try? JSONDecoder().decode(OCRModelStore.VerifiedManifest.self, from: data),
+              manifest.modelID == entry.id.rawValue
+        else { return false }
+        return true
     }
 
     func testGLMCPURecognition() throws { try self.runCase(id: .glmOCR, compute: .cpu) }
@@ -83,15 +95,3 @@ enum OCRDeviceCaps {
     }
 }
 
-extension OCRModelStore {
-    /// Synchronous status probe for the opt-in suite's skip logic.
-    func statusSyncForTests(entry: OCRModelEntry) -> Status {
-        let directory = root.appendingPathComponent("\(entry.id.rawValue)/\(entry.revision)", isDirectory: true)
-        let manifestURL = directory.appendingPathComponent("verified.json")
-        guard let data = try? Data(contentsOf: manifestURL),
-              let manifest = try? JSONDecoder().decode(VerifiedManifest.self, from: data),
-              manifest.modelID == entry.id.rawValue
-        else { return .notInstalled }
-        return .installed
-    }
-}

@@ -166,7 +166,8 @@ final class DocumentAndPDFTests: XCTestCase {
         let note = directory.appendingPathComponent("note.txt")
         try "Orange document\nSecond line".write(to: note, atomically: true, encoding: .utf8)
         let docx = try await DocumentConverter.convert(note, to: .docx)
-        XCTAssertTrue(try await DocumentConverter.load(docx).string.contains("Orange document"))
+        let docxText = try await DocumentConverter.load(docx).string
+        XCTAssertTrue(docxText.contains("Orange document"))
         let pdf = try await DocumentConverter.convert(note, to: .pdf)
         let pdfText = try await PDFToolkit.text(of: pdf)
         XCTAssertTrue(pdfText.contains("Second line"))

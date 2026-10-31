@@ -329,6 +329,10 @@ struct OCRWorkspace: View {
         OCRModelCatalog.all.map { ($0.id, $0.displayName) }
     }
 
+    private var supportedModes: [OCRMode] {
+        OCRModelCatalog.entry(for: model.options.modelID)?.modes ?? [.text]
+    }
+
     private var languageTag: String {
         let ids = model.options.languageIdentifiers
         if ids.isEmpty { return "" }

@@ -1,4 +1,5 @@
 import Foundation
+import OrangeKit
 
 /// Download/install state per model for OCRModelsView. Consent-gated: no
 /// download starts unless Consent.accepted. One active transfer app-wide.
