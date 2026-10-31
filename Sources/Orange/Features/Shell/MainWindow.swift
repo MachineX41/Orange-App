@@ -4,26 +4,28 @@ import SwiftUI
 struct MainWindow: View {
     @Environment(AppRuntime.self) private var runtime
     @Environment(\.openWindow) private var openWindow
+    @Namespace private var sidebarSelection
     @State var dropTargeted = false
 
     var body: some View {
         @Bindable var runtime = runtime
         NavigationSplitView {
-            List(selection: Binding<AppSection?>(get: { runtime.section }, set: { if let value = $0 { runtime.section = value } })) {
+            List {
                 Section {
-                    Label(L("Home", "Ana Sayfa"), systemImage: "house").tag(AppSection.home)
-                    Label(L("Download", "İndir"), systemImage: "arrow.down").tag(AppSection.download)
-                    Label(L("Library", "Kitaplık"), systemImage: "clock").tag(AppSection.library)
-                    Label(L("Shelf", "Raf"), systemImage: "tray")
-                        .badge(runtime.shelf.count)
-                        .tag(AppSection.shelf)
+                    SidebarItem(section: .home, title: L("Home", "Ana Sayfa"), symbol: "house", namespace: sidebarSelection)
+                    SidebarItem(section: .download, title: L("Download", "İndir"), symbol: "arrow.down", namespace: sidebarSelection)
+                    SidebarItem(section: .library, title: L("Library", "Kitaplık"), symbol: "clock", namespace: sidebarSelection)
+                    SidebarItem(section: .shelf, title: L("Shelf", "Raf"), symbol: "tray", badge: runtime.shelf.count, namespace: sidebarSelection)
                 }
                 Section(L("Tools", "Araçlar")) {
                     ForEach(MediaKind.toolKinds) { kind in
-                        Label(kind.title, systemImage: kind.symbol).tag(AppSection.tools(kind))
+                        SidebarItem(section: .tools(kind), title: kind.title, symbol: kind.symbol, namespace: sidebarSelection)
                     }
                 }
             }
+            .listStyle(.sidebar)
+            .tint(OrangeTheme.accent)
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: runtime.section)
             .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 260)
         } detail: {
             ZStack {
@@ -85,6 +87,60 @@ struct MainWindow: View {
         case .shelf: ShelfView()
         case .tools(let kind): ToolsView(kind: kind)
         }
+    }
+}
+
+/// Sidebar row whose selection is Orange, rather than the system accent.
+struct SidebarItem: View {
+    @Environment(AppRuntime.self) private var runtime
+    var section: AppSection
+    var title: String
+    var symbol: String
+    var badge = 0
+    var namespace: Namespace.ID
+    @State private var hovered = false
+
+    private var selected: Bool { runtime.section == section }
+
+    var body: some View {
+        Button {
+            runtime.section = section
+        } label: {
+            HStack(spacing: 6) {
+                Label(title, systemImage: symbol)
+                    .symbolRenderingMode(.monochrome)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                Spacer(minLength: 4)
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(selected ? Color.white.opacity(0.92) : Color.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(OrangeTheme.accent)
+                        .matchedGeometryEffect(id: "sidebarSelection", in: namespace)
+                } else if hovered {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.06))
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovered)
+        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
