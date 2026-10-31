@@ -159,6 +159,7 @@ struct LoadedModel {
     std::string modelID;
     int nBatch = 512;
     bool projectorCPUOnly = false;
+    bool cpuOnly = true;
     llama_pos nPast = 0;
 };
 
@@ -177,10 +178,12 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     common_params params;
     params.model.path = modelPath;
     params.mmproj.path = projectorPath;
-    params.n_ctx = contextTokens;
-    params.n_batch = 512;
-    params.n_ubatch = 128;
+    params.n_ctx = 0;  // 0 = model-trained context
+    params.n_batch = 2048;
+    params.n_ubatch = 512;
+    (void)contextTokens;
     params.cpuparams.n_threads = std::max(1, std::min(threads, 8));
+    params.cpuparams_batch.n_threads = params.cpuparams.n_threads;
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
     params.sampling.temp = 0.0;  // greedy
     params.sampling.top_k = 1;
@@ -239,6 +242,7 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     loaded.modelID = modelID;
     loaded.nBatch = params.n_batch;
     loaded.projectorCPUOnly = projectorCPU;
+    loaded.cpuOnly = cpuOnly;
     loaded.nPast = 0;
 
     std::ostringstream out;
@@ -381,7 +385,7 @@ int doRecognize(LoadedModel& loaded, const std::string& line) {
     auto elapsed = std::chrono::steady_clock::now() - started;
     double seconds = std::chrono::duration<double>(elapsed).count();
 
-    std::string compute = loaded.projectorCPUOnly ? "metalTextCPUProjector" : "metal";
+    std::string compute = loaded.cpuOnly ? "cpu" : (loaded.projectorCPUOnly ? "metalTextCPUProjector" : "metal");
     std::ostringstream out;
     out << "{\"type\":\"result\",\"protocolVersion\":" << kProtocolVersion
         << ",\"requestID\":\"" << jsonEscape(requestID) << "\""
