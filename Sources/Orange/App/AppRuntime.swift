@@ -394,10 +394,14 @@ final class AppRuntime {
         progress[id] = 0
         ActivityHUD.shared.refresh()
         let report: ProgressHandler = { value in
+            let clamped = min(max(value, 0), 1)
             Task { @MainActor in
                 let runtime = AppRuntime.shared
-                guard let current = runtime.progress[id], value - current >= 0.01 || value >= 1 else { return }
-                runtime.progress[id] = min(max(value, 0), 1)
+                guard let current = runtime.progress[id] else { return }
+                let delta = abs(clamped - current)
+                // The first bytes, every noticeable step, a new file starting over, and completion.
+                guard delta >= 0.004 || clamped >= 1 || (current == 0 && clamped > 0) else { return }
+                runtime.progress[id] = clamped
             }
         }
         return Task {

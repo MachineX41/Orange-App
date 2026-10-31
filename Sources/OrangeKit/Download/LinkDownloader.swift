@@ -63,11 +63,11 @@ public enum LinkDownloader {
         do {
             for try await byte in bytes {
                 buffer.append(byte)
-                if buffer.count >= 1 << 20 {
+                if buffer.count >= 256 * 1024 {
                     try handle.write(contentsOf: buffer)
                     received += Int64(buffer.count)
                     buffer.removeAll(keepingCapacity: true)
-                    if expected > 0 { progress?(Double(received) / Double(expected)) }
+                    if expected > 0 { progress?(min(0.99, Double(received) / Double(expected))) }
                     try Task.checkCancellation()
                 }
             }
@@ -123,52 +123,114 @@ public enum LinkDownloader {
 
     // MARK: yt-dlp
 
+    /// Turns yt-dlp's streamed output into a 0...1 fraction. Progress is often one line per update,
+    /// but it also arrives as carriage-return rewrites, so every segment is parsed and the newest
+    /// percentage in a chunk wins.
+    public struct DownloadProgressReader: Sendable {
+        private var pending = ""
+        private var partFloor = 0.0
+        private var previous = 0.0
+        public private(set) var paths: [String] = []
+
+        public init() {}
+
+        public mutating func feed(_ chunk: String) -> [Double] {
+            pending += Self.stripControls(chunk)
+            var updates: [Double] = []
+            while let breakIndex = pending.firstIndex(where: { $0 == "\n" || $0 == "\r" }) {
+                let line = String(pending[..<breakIndex])
+                pending.removeSubrange(pending.startIndex...breakIndex)
+                if let value = interpret(line) { updates.append(scale(value)) }
+            }
+            return updates
+        }
+
+        public mutating func finish() -> (progress: Double?, paths: [String]) {
+            let rest = pending
+            pending = ""
+            return (interpret(rest).map { scale($0) }, paths)
+        }
+
+        private mutating func interpret(_ line: String) -> Double? {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            if trimmed.hasPrefix("ORANGEPROG:") {
+                let raw = trimmed.dropFirst("ORANGEPROG:".count).trimmingCharacters(in: .whitespaces)
+                guard let value = Double(raw) else { return nil }
+                return min(1, max(0, value / 100))
+            }
+            if trimmed.hasPrefix("ORANGE:") {
+                let path = String(trimmed.dropFirst("ORANGE:".count))
+                if !path.isEmpty { paths.append(path) }
+                return nil
+            }
+            guard trimmed.contains("[download]"),
+                  let match = trimmed.range(of: #"(\d+(?:\.\d+)?)%"#, options: .regularExpression) else { return nil }
+            let number = trimmed[match].dropLast()
+            guard let value = Double(number) else { return nil }
+            return min(1, max(0, value / 100))
+        }
+
+        /// Video and audio arrive as two downloads. Fold the second into the rest of the ring
+        /// instead of snapping the indicator back to zero.
+        private mutating func scale(_ raw: Double) -> Double {
+            if raw + 0.05 < previous {
+                partFloor = min(0.85, max(partFloor, previous))
+            }
+            previous = raw
+            return min(0.99, partFloor + (1 - partFloor) * raw)
+        }
+
+        private static func stripControls(_ text: String) -> String {
+            var output = ""
+            var skipping = false
+            for character in text {
+                if character == "\u{1B}" {
+                    skipping = true
+                    continue
+                }
+                if skipping {
+                    if character.isLetter { skipping = false }
+                    continue
+                }
+                output.append(character)
+            }
+            return output
+        }
+    }
+
     final class OutputCollector: @unchecked Sendable {
         private let lock = NSLock()
-        private var pending = ""
-        private(set) var paths: [String] = []
+        private var reader = DownloadProgressReader()
         private(set) var errors = ""
         let progress: ProgressHandler?
 
         init(progress: ProgressHandler?) { self.progress = progress }
 
         func consume(_ chunk: String) {
-            lock.lock()
-            pending += chunk
-            var lines = pending.components(separatedBy: "\n")
-            pending = lines.removeLast()
-            lock.unlock()
-            for line in lines { handle(line) }
+            let updates = ingest(chunk, isError: false)
+            if let value = updates.last { progress?(value) }
         }
 
         func error(_ chunk: String) {
-            lock.lock()
-            errors += chunk
-            lock.unlock()
+            let updates = ingest(chunk, isError: true)
+            if let value = updates.last { progress?(value) }
         }
 
         func finish() -> [String] {
             lock.lock()
-            let rest = pending
-            pending = ""
+            let result = reader.finish()
             lock.unlock()
-            if !rest.isEmpty { handle(rest) }
-            lock.lock()
-            defer { lock.unlock() }
-            return paths
+            if let value = result.progress { progress?(value) }
+            return result.paths
         }
 
-        private func handle(_ line: String) {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.hasPrefix("ORANGE:") {
-                lock.lock()
-                paths.append(String(trimmed.dropFirst(7)))
-                lock.unlock()
-            } else if trimmed.hasPrefix("[download]"),
-                      let percent = trimmed.split(separator: " ").first(where: { $0.hasSuffix("%") }),
-                      let value = Double(percent.dropLast()) {
-                progress?(min(0.99, value / 100))
-            }
+        private func ingest(_ chunk: String, isError: Bool) -> [Double] {
+            lock.lock()
+            if isError { errors += chunk }
+            let updates = reader.feed(chunk)
+            lock.unlock()
+            return updates
         }
     }
 
@@ -176,7 +238,9 @@ public enum LinkDownloader {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: tool)
         var arguments = [
-            "--no-playlist", "--newline", "--no-mtime", "--restrict-filenames",
+            "--no-playlist", "--newline", "--progress", "--no-mtime", "--restrict-filenames",
+            "--progress-delta", "0.15",
+            "--progress-template", "download:ORANGEPROG:%(progress._percent)s",
             "-P", directory.path,
             "-o", "%(title).120B.%(ext)s",
             "--print", "after_move:ORANGE:%(filepath)s"
@@ -189,24 +253,23 @@ public enum LinkDownloader {
         process.arguments = arguments + [url.absoluteString]
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (environment["PATH"] ?? "")
+        environment["PYTHONUNBUFFERED"] = "1"
         process.environment = environment
         let out = Pipe()
         let err = Pipe()
         process.standardOutput = out
         process.standardError = err
         let collector = OutputCollector(progress: progress)
-        out.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            if !data.isEmpty { collector.consume(String(decoding: data, as: UTF8.self)) }
-        }
-        err.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            if !data.isEmpty { collector.error(String(decoding: data, as: UTF8.self)) }
-        }
+        let pipes = DispatchGroup()
+        pipes.enter()
+        pipes.enter()
+        Self.stream(out.fileHandleForReading, group: pipes) { collector.consume($0) }
+        Self.stream(err.fileHandleForReading, group: pipes) { collector.error($0) }
         try process.run()
         await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 DispatchQueue.global().async {
+                    pipes.wait()
                     process.waitUntilExit()
                     continuation.resume()
                 }
@@ -214,8 +277,6 @@ public enum LinkDownloader {
         } onCancel: {
             process.terminate()
         }
-        out.fileHandleForReading.readabilityHandler = nil
-        err.fileHandleForReading.readabilityHandler = nil
         if Task.isCancelled { throw OrangeError.cancelled }
         let paths = collector.finish()
         guard process.terminationStatus == 0, !paths.isEmpty else {
@@ -226,5 +287,34 @@ public enum LinkDownloader {
         }
         progress?(1)
         return paths.map { URL(fileURLWithPath: $0) }
+    }
+
+    /// Reads a pipe until it closes, so each progress line is delivered as yt-dlp writes it.
+    private static func stream(_ handle: FileHandle, group: DispatchGroup, receive: @escaping @Sendable (String) -> Void) {
+        let gate = PipeGate()
+        handle.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty {
+                gate.close {
+                    handle.readabilityHandler = nil
+                    group.leave()
+                }
+                return
+            }
+            receive(String(decoding: data, as: UTF8.self))
+        }
+    }
+
+    private final class PipeGate: @unchecked Sendable {
+        private let lock = NSLock()
+        private var closed = false
+
+        func close(_ body: () -> Void) {
+            lock.lock()
+            let first = !closed
+            closed = true
+            lock.unlock()
+            if first { body() }
+        }
     }
 }

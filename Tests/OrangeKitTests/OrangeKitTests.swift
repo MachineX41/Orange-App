@@ -262,3 +262,43 @@ final class MediaPipelineTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: clean.path))
     }
 }
+
+final class DownloadProgressTests: XCTestCase {
+    func testProgressFollowsTheNewestPercent() {
+        var reader = LinkDownloader.DownloadProgressReader()
+        let first = reader.feed("ORANGEPROG:0.0\rORANGEPROG:12.5\r")
+        XCTAssertEqual(first.count, 2)
+        XCTAssertEqual(first[0], 0, accuracy: 0.0001)
+        XCTAssertEqual(first[1], 0.125, accuracy: 0.0001)
+        let split = reader.feed("ORANGEPROG:40") + reader.feed(".5\n[download]  80.0% of 1.00MiB\n")
+        XCTAssertEqual(split.count, 2)
+        XCTAssertEqual(split[0], 0.405, accuracy: 0.0001)
+        XCTAssertEqual(split[1], 0.8, accuracy: 0.0001)
+    }
+
+    func testColoredAndUnknownPercents() {
+        var reader = LinkDownloader.DownloadProgressReader()
+        let updates = reader.feed("\u{1B}[0;94m[download]\u{1B}[0m   7.5% of 2.00MiB\n[download]  N/A% of Unknown\n")
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertEqual(updates[0], 0.075, accuracy: 0.0001)
+        let finished = reader.finish()
+        XCTAssertNil(finished.progress)
+        XCTAssertTrue(finished.paths.isEmpty)
+    }
+
+    func testOutputPathIsSeparateFromProgress() {
+        var reader = LinkDownloader.DownloadProgressReader()
+        XCTAssertTrue(reader.feed("ORANGEPROG:NA\nORANGE:/tmp/clip.mp4\n").isEmpty)
+        let finished = reader.finish()
+        XCTAssertNil(finished.progress)
+        XCTAssertEqual(finished.paths, ["/tmp/clip.mp4"])
+    }
+
+    func testSecondFileContinuesTheRing() {
+        var reader = LinkDownloader.DownloadProgressReader()
+        let values = reader.feed("ORANGEPROG:100\nORANGEPROG:0.3\nORANGEPROG:50\n")
+        XCTAssertEqual(values[0], 0.99, accuracy: 0.001)
+        XCTAssertGreaterThan(values[1], 0.8)
+        XCTAssertGreaterThan(values[2], values[1])
+    }
+}

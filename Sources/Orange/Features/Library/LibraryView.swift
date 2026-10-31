@@ -68,7 +68,10 @@ struct JobRow: View {
             Spacer()
             switch job.state {
             case .running:
-                ProgressView(value: progress ?? 0).frame(width: 90).tint(OrangeTheme.accent)
+                ProgressView(value: progress ?? 0)
+                    .frame(width: 90)
+                    .tint(OrangeTheme.accent)
+                    .animation(.easeOut(duration: 0.2), value: progress ?? 0)
             case .success:
                 Text(job.createdAt, style: .relative).font(.caption).foregroundStyle(.secondary)
                 Button {

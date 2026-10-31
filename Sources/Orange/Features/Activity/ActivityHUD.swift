@@ -79,10 +79,22 @@ struct JobToast: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().stroke(.quaternary, lineWidth: 3)
-                Circle()
-                    .trim(from: 0, to: max(0.03, progress))
-                    .stroke(OrangeTheme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
+                if progress > 0 {
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(OrangeTheme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeOut(duration: 0.2), value: progress)
+                } else {
+                    TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+                        let angle = timeline.date.timeIntervalSinceReferenceDate
+                            .truncatingRemainder(dividingBy: 1) * 360
+                        Circle()
+                            .trim(from: 0, to: 0.28)
+                            .stroke(OrangeTheme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(angle - 90))
+                    }
+                }
                 Image(systemName: job.symbol)
                     .font(.system(size: 11, weight: .semibold))
             }
@@ -92,15 +104,24 @@ struct JobToast: View {
                 Text(job.detail).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Text(progress, format: .percent.precision(.fractionLength(0)))
+            Text(progressLabel)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.2), value: progressLabel)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .frame(width: 330)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private var progressLabel: String {
+        guard progress > 0 else { return "…" }
+        let percent = progress * 100
+        if percent < 10 { return String(format: "%.1f%%", percent) }
+        return "\(Int(percent.rounded()))%"
     }
 }
 
