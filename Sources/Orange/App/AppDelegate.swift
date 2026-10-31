@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Consent.accepted { DragWatcher.shared.start() }
+        configureNativeOCR()
 
         if hidesLaunchWindow {
             // Pencere bu anda görünürse hemen gizle; değilse didBecomeKey yakalayacak.
@@ -55,6 +56,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar)
         }
+    }
+
+    /// Wires the warm native helper into OCRService once at launch.
+    /// No model loads here — first inference with a VLM triggers load.
+    private func configureNativeOCR() {
+        let helper = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Helpers/OrangeOCRHelper")
+        guard FileManager.default.isExecutableFile(atPath: helper.path) else { return }
+        Task { await OCRService.shared.configureNative(engine: NativeOCREngine(helperURL: helper)) }
     }
 
     /// The system Settings item's key changes with the macOS language (⌘Ö in Turkish), so it is read rather than assumed.
