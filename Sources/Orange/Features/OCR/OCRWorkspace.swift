@@ -5,6 +5,7 @@ import SwiftUI
 /// Owned by AppRuntime so tab switches never lose input or running jobs.
 struct OCRWorkspace: View {
     @Environment(AppRuntime.self) private var runtime
+    @Environment(\.openSettings) private var openSettings
     @State private var runner: OCRRunner?
     @State private var wide = true
     @State private var narrowTab = 0
@@ -250,6 +251,7 @@ struct OCRWorkspace: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
+        .padding(14)
         .glassCard(radius: 20)
     }
 
@@ -265,6 +267,7 @@ struct OCRWorkspace: View {
                     .frame(minHeight: 300)
             }
         }
+        .padding(14)
         .glassCard(radius: 20)
     }
 
@@ -323,6 +326,7 @@ struct OCRWorkspace: View {
                     .frame(minHeight: 300)
             }
         }
+        .padding(14)
         .glassCard(radius: 20)
     }
 
@@ -412,7 +416,7 @@ struct OCRWorkspace: View {
 
     private func openModels() {
         runtime.settingsTab = .models
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        try? openSettings()
     }
 
     private func copy(page: OCRWorkspaceModel.PageState) {
