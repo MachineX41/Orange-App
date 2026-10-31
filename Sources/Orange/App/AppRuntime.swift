@@ -211,9 +211,7 @@ final class AppRuntime {
 
     func setGlobalHighlight(_ index: Int?) {
         guard index != globalHighlight else { return }
-        if hapticOnWheel, index != nil {
-            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-        }
+        if index != nil { WheelFeedback.sliceChanged() }
         globalHighlight = index
     }
 

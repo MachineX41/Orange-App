@@ -33,10 +33,16 @@ final class GlobalWheel {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
 
         let container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.wantsLayer = true
+        container.layer?.backgroundColor = .clear
+        container.layer?.shadowOpacity = 0
         let host = NSHostingView(rootView: GlobalWheelView().environment(AppRuntime.shared))
         host.frame = container.bounds
         host.autoresizingMask = [.width, .height]
         host.sizingOptions = []
+        host.wantsLayer = true
+        host.layer?.backgroundColor = .clear
+        host.layer?.shadowOpacity = 0
         let drop = WheelDropView(frame: container.bounds)
         drop.autoresizingMask = [.width, .height]
         container.addSubview(host)

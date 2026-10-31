@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "wheel":
                 guard let mode = WheelMode(rawValue: parts[1]), let session = runtime.session(mode, files: files) else { return }
                 runtime.globalWheel = session
-                runtime.globalHighlight = 1
+                runtime.globalHighlight = nil
                 if let screen = NSScreen.main { GlobalWheel.shared.show(at: NSPoint(x: screen.frame.midX, y: screen.frame.midY)) }
             case "tool":
                 guard let tool = ToolID(rawValue: parts[1]) else { return }

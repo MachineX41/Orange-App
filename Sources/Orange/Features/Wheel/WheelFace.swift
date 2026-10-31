@@ -1,19 +1,20 @@
+import AVFoundation
 import OrangeKit
 import SwiftUI
 
 enum WheelMetrics {
-    static let size: CGFloat = 470
-    static let outer: CGFloat = 214
-    static let inner: CGFloat = 98
-    static let gap: CGFloat = 7
-    static let corner: CGFloat = 16
+    static let size: CGFloat = 308
+    static let outer: CGFloat = 142
+    static let inner: CGFloat = 58
+    static let gap: CGFloat = 5
+    static let corner: CGFloat = 14
 
     static func layout(count: Int, in size: CGSize = CGSize(width: WheelMetrics.size, height: WheelMetrics.size)) -> WheelLayout {
         WheelLayout(
             center: CGPoint(x: size.width / 2, y: size.height / 2),
             ringRadius: (outer + inner) / 2,
-            innerRadius: inner - 6,
-            outerRadius: outer + 40,
+            innerRadius: inner + 2,
+            outerRadius: outer + 8,
             count: count
         )
     }
@@ -68,51 +69,36 @@ struct WheelFace: View {
 
     var body: some View {
         ZStack {
-            GlassEffectContainer(spacing: 10) {
-                ZStack {
-                    ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, _ in
-                        let shape = WheelSegment(index: index, count: session.choices.count)
-                        Color.clear
-                            .frame(width: WheelMetrics.size, height: WheelMetrics.size)
-                            .glassEffect(glass(for: index), in: shape)
-                            .overlay {
-                                shape.fill(LinearGradient(colors: [Color(hex: 0xFF8A3D), OrangeTheme.accentDeep], startPoint: .top, endPoint: .bottom))
-                                    .opacity(index == highlight ? 1 : 0)
-                            }
-                            .overlay {
-                                shape.stroke(
-                                    LinearGradient(colors: [.white.opacity(index == highlight ? 0.7 : 0.38), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom),
-                                    lineWidth: 1
-                                )
-                            }
-                    }
+            GlassEffectContainer(spacing: 0) {
+                ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, _ in
+                    let shape = WheelSegment(index: index, count: session.choices.count)
                     Color.clear
                         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
-                        .glassEffect(.regular.tint(.black.opacity(0.28)), in: Circle().inset(by: WheelMetrics.size / 2 - WheelMetrics.inner + 12))
+                        .glassEffect(glass(for: index), in: shape)
                         .overlay {
-                            Circle().inset(by: WheelMetrics.size / 2 - WheelMetrics.inner + 12)
-                                .stroke(.white.opacity(0.22), lineWidth: 1)
+                            shape
+                                .fill(LinearGradient(colors: [Color(hex: 0xFF8A3D), OrangeTheme.accentDeep], startPoint: .top, endPoint: .bottom))
+                                .opacity(index == highlight ? 0.92 : 0)
+                                .allowsHitTesting(false)
                         }
                 }
             }
-            .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
 
             ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, choice in
                 let selected = index == highlight
-                VStack(spacing: 6) {
+                VStack(spacing: 3) {
                     Image(systemName: choice.symbol)
-                        .font(.system(size: 22, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 17, weight: .medium))
+                        .symbolRenderingMode(.monochrome)
                     Text(choice.title.uppercased(with: .current))
-                        .font(.system(size: 10.5, weight: .bold))
-                        .tracking(0.6)
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.4)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.6)
                 }
-                .foregroundStyle(.white.opacity(selected ? 1 : 0.92))
-                .shadow(color: .black.opacity(selected ? 0.2 : 0.35), radius: 2, y: 1)
-                .frame(width: 84)
-                .scaleEffect(selected ? 1.12 : 1)
+                .foregroundStyle(selected ? Color.white : Color.primary)
+                .frame(width: 64)
+                .scaleEffect(selected ? 1.04 : 1)
                 .position(layout.point(for: index))
             }
 
@@ -123,42 +109,28 @@ struct WheelFace: View {
     }
 
     private func glass(for index: Int) -> Glass {
-        index == highlight ? .regular.tint(OrangeTheme.accent).interactive() : .regular.tint(.black.opacity(0.34)).interactive()
+        index == highlight ? .regular.tint(OrangeTheme.accent).interactive() : .regular.interactive()
     }
 }
 
 struct WheelCenter: View {
     var session: WheelSession
 
+    private var label: String {
+        let size = ByteCountFormatter.string(fromByteCount: session.files.reduce(0) { $0 + $1.byteCount }, countStyle: .file)
+        return session.files.count > 1 ? "\(session.files.count) · \(size)" : size
+    }
+
     var body: some View {
-        VStack(spacing: 7) {
-            Label(session.mode.title.uppercased(with: .current), systemImage: session.mode.symbol)
-                .font(.system(size: 9.5, weight: .heavy))
-                .tracking(0.8)
-                .foregroundStyle(OrangeTheme.ember)
-            ZStack(alignment: .topTrailing) {
-                if let first = session.files.first {
-                    FileThumbnail(url: first.url, side: 66, radius: 12)
-                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
-                }
-                if session.files.count > 1 {
-                    Text("\(session.files.count)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(OrangeTheme.accent, in: Capsule())
-                        .offset(x: 8, y: -6)
-                }
-            }
-            Text(ByteCountFormatter.string(fromByteCount: session.files.reduce(0) { $0 + $1.byteCount }, countStyle: .file))
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .padding(.horizontal, 9)
-                .padding(.vertical, 3)
-                .glassEffect(.regular, in: Capsule())
-        }
-        .frame(width: WheelMetrics.inner * 2 - 24)
+        Text(label)
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .glassEffect(.regular, in: Capsule())
     }
 }
 
@@ -181,9 +153,7 @@ struct LocalWheelOverlay: View {
                     switch phase {
                     case .active(let point):
                         let index = WheelMetrics.layout(count: session.choices.count).index(at: point)
-                        if index != highlight, index != nil, runtime.hapticOnWheel {
-                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                        }
+                        if index != highlight, index != nil { WheelFeedback.sliceChanged() }
                         highlight = index
                     case .ended:
                         break
@@ -222,7 +192,72 @@ struct LocalWheelOverlay: View {
 
     private func step(_ delta: Int) -> KeyPress.Result {
         let count = session.choices.count
-        highlight = ((highlight ?? (delta > 0 ? -1 : 0)) + delta + count) % count
+        let next = ((highlight ?? (delta > 0 ? -1 : 0)) + delta + count) % count
+        if next != highlight { WheelFeedback.sliceChanged() }
+        highlight = next
         return .handled
+    }
+}
+
+/// Quiet tick plus the system alignment haptic when the pointer moves onto another slice.
+enum WheelFeedback {
+    @MainActor
+    static func sliceChanged() {
+        WheelTick.play()
+        guard AppRuntime.shared.hapticOnWheel else { return }
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+    }
+}
+
+/// A 20 ms decaying tick. Loud system sounds read as alerts; this stays under the interface.
+private enum WheelTick {
+    private static let clip: Data = makeWav()
+    private static let player: AVAudioPlayer? = {
+        let player = try? AVAudioPlayer(data: clip)
+        player?.volume = 0.2
+        player?.prepareToPlay()
+        return player
+    }()
+
+    static func play() {
+        guard let player else { return }
+        if player.isPlaying { player.stop() }
+        player.currentTime = 0
+        player.play()
+    }
+
+    private static func makeWav() -> Data {
+        let sampleRate = 44_100
+        let count = 980
+        var pcm = Data(count: count * 2)
+        pcm.withUnsafeMutableBytes { raw in
+            let samples = raw.bindMemory(to: Int16.self)
+            for index in 0..<count {
+                let time = Double(index) / Double(sampleRate)
+                let click = sin(2 * .pi * 2400 * time) * exp(-time * 280)
+                let body = sin(2 * .pi * 980 * time) * exp(-time * 140) * 0.35
+                let wave = max(-1, min(1, (click * 0.55 + body) * 0.5))
+                samples[index] = Int16(wave * 32_767)
+            }
+        }
+        var data = Data()
+        func ascii(_ value: String) { data.append(Data(value.utf8)) }
+        func u32(_ value: UInt32) { var little = value.littleEndian; data.append(Data(bytes: &little, count: 4)) }
+        func u16(_ value: UInt16) { var little = value.littleEndian; data.append(Data(bytes: &little, count: 2)) }
+        ascii("RIFF")
+        u32(UInt32(36 + pcm.count))
+        ascii("WAVE")
+        ascii("fmt ")
+        u32(16)
+        u16(1)
+        u16(1)
+        u32(UInt32(sampleRate))
+        u32(UInt32(sampleRate * 2))
+        u16(2)
+        u16(16)
+        ascii("data")
+        u32(UInt32(pcm.count))
+        data.append(pcm)
+        return data
     }
 }
