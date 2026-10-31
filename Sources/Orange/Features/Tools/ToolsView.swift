@@ -27,10 +27,9 @@ struct ToolsView: View {
                         } label: {
                             HStack(spacing: 14) {
                                 Image(systemName: tool.symbol)
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 42, height: 42)
-                                    .background(kind.tint.gradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .font(.system(size: 16, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 22, height: 22)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(tool.windowTitle).font(.system(size: 14, weight: .semibold))
                                     Text(tool.subtitle).font(.system(size: 12)).foregroundStyle(.secondary)

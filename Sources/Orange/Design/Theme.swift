@@ -95,6 +95,27 @@ extension View {
     }
 }
 
+/// The application icon, used wherever Orange itself is the mark.
+struct OrangeMark: View {
+    var side: CGFloat = 36
+
+    var body: some View {
+        Image(nsImage: OrangeMark.image)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: side, height: side)
+            .clipShape(RoundedRectangle(cornerRadius: side * 0.2237, style: .continuous))
+    }
+
+    private static let image: NSImage = {
+        if let url = Bundle.main.url(forResource: "OrangeLogo", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            return image
+        }
+        return NSImage(named: NSImage.applicationIconName) ?? NSImage()
+    }()
+}
+
 struct SectionLabel: View {
     var title: String
     var symbol: String?
@@ -103,11 +124,12 @@ struct SectionLabel: View {
         HStack(spacing: 6) {
             if let symbol {
                 Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .medium))
             }
             Text(title)
         }
-        .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(OrangeTheme.ember)
+        .font(.system(size: 12.5, weight: .medium))
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

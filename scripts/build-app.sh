@@ -18,6 +18,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$root/build/AppIcon.ic
 
 cp "$bin/Orange" "$app/Contents/MacOS/Orange"
 cp "$root/Configuration/Info.plist" "$app/Contents/Info.plist"
+cp "$root/Configuration/AppIcon.png" "$app/Contents/Resources/OrangeLogo.png"
 chmod +x "$app/Contents/MacOS/Orange"
 
 swiftc -O -framework AppKit -framework CoreGraphics \

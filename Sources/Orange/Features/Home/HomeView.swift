@@ -11,7 +11,7 @@ struct HomeView: View {
                 PageHeader(
                     title: "Orange",
                     subtitle: L("Convert, edit and move files right where you drag them.", "Dosyaları sürüklediğiniz yerde dönüştürün, düzenleyin, taşıyın."),
-                    symbol: "circle.hexagongrid.fill"
+                    brand: true
                 )
                 if runtime.selection.isEmpty {
                     DropZone()
@@ -36,12 +36,9 @@ struct DropZone: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "arrow.down.doc.fill")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 72, height: 72)
-                .background(OrangeTheme.accentGradient, in: Circle())
-                .shadow(color: OrangeTheme.accent.opacity(0.4), radius: 16, y: 6)
+            Image(systemName: "arrow.down.doc")
+                .font(.system(size: 26, weight: .light))
+                .foregroundStyle(.secondary)
             VStack(spacing: 5) {
                 Text(L("Drop files to begin", "Başlamak için dosya bırakın"))
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -158,8 +155,8 @@ struct SelectionPanel: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: tool.symbol)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(OrangeTheme.accent)
+                                        .font(.system(size: 14, weight: .regular))
+                                        .foregroundStyle(.secondary)
                                         .frame(width: 22)
                                     Text(tool.title).font(.system(size: 13, weight: .medium))
                                     Spacer(minLength: 0)
@@ -252,7 +249,9 @@ struct GestureGuide: View {
                 KeyCap(text: mode.key)
                 Text(mode.title).font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Image(systemName: mode.symbol).foregroundStyle(OrangeTheme.accent)
+                Image(systemName: mode.symbol)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.tertiary)
             }
             Text(text)
                 .font(.system(size: 12))

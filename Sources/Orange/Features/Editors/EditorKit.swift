@@ -78,10 +78,9 @@ struct EditorScaffold<Stage: View, Inspector: View, Footer: View>: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: editor.tool.symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(OrangeTheme.accentGradient, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(editor.tool.windowTitle).font(.system(size: 15, weight: .semibold))
                 Text(editor.files.count == 1 ? editor.files[0].lastPathComponent : L("\(editor.files.count) files", "\(editor.files.count) dosya"))

@@ -44,9 +44,11 @@ struct OrangeApp: App {
                 .preferredColorScheme(runtime.appearance.colorScheme)
         }
 
-        MenuBarExtra("Orange", systemImage: "circle.hexagongrid.fill") {
+        MenuBarExtra {
             MenuBarView()
                 .environment(runtime)
+        } label: {
+            OrangeMark(side: 18)
         }
     }
 }

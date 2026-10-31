@@ -12,9 +12,9 @@ struct MainWindow: View {
             List(selection: Binding<AppSection?>(get: { runtime.section }, set: { if let value = $0 { runtime.section = value } })) {
                 Section {
                     Label(L("Home", "Ana Sayfa"), systemImage: "house").tag(AppSection.home)
-                    Label(L("Download", "İndir"), systemImage: "arrow.down.circle").tag(AppSection.download)
-                    Label(L("Library", "Kitaplık"), systemImage: "clock.arrow.circlepath").tag(AppSection.library)
-                    Label(L("Shelf", "Raf"), systemImage: "tray.full")
+                    Label(L("Download", "İndir"), systemImage: "arrow.down").tag(AppSection.download)
+                    Label(L("Library", "Kitaplık"), systemImage: "clock").tag(AppSection.library)
+                    Label(L("Shelf", "Raf"), systemImage: "tray")
                         .badge(runtime.shelf.count)
                         .tag(AppSection.shelf)
                 }
@@ -123,21 +123,22 @@ struct FlowLayout: Layout {
 struct PageHeader: View {
     var title: String
     var subtitle: String
-    var symbol: String?
+    var symbol: String? = nil
+    var brand = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            if let symbol {
+        HStack(alignment: .center, spacing: 12) {
+            if brand {
+                OrangeMark(side: 40)
+            } else if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(OrangeTheme.accentGradient, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .shadow(color: OrangeTheme.accent.opacity(0.35), radius: 10, y: 4)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 28, weight: .bold, design: .rounded))
-                Text(subtitle).font(.system(size: 13.5)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 26, weight: .semibold, design: .rounded))
+                Text(subtitle).font(.system(size: 13)).foregroundStyle(.secondary)
             }
             Spacer()
         }
