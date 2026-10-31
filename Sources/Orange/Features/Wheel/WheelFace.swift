@@ -6,8 +6,8 @@ enum WheelMetrics {
     static let size: CGFloat = 308
     static let outer: CGFloat = 142
     static let inner: CGFloat = 58
-    static let gap: CGFloat = 5
-    static let corner: CGFloat = 14
+    static let gap: CGFloat = 4
+    static let corner: CGFloat = 12
 
     static func layout(count: Int, in size: CGSize = CGSize(width: WheelMetrics.size, height: WheelMetrics.size)) -> WheelLayout {
         WheelLayout(
@@ -31,33 +31,51 @@ struct WheelSegment: Shape {
 
     func path(in rect: CGRect) -> Path {
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        guard count > 1 else {
-            let ring = Path(ellipseIn: CGRect(x: center.x - outer, y: center.y - outer, width: outer * 2, height: outer * 2))
-            return ring.subtracting(Path(ellipseIn: CGRect(x: center.x - inner, y: center.y - inner, width: inner * 2, height: inner * 2)))
-        }
+        guard count > 1 else { return annulus(center: center) }
+
         let slice = 2 * CGFloat.pi / CGFloat(count)
         let mid = -CGFloat.pi / 2 + CGFloat(index) * slice
-        let r0 = inner + corner
-        let r1 = outer - corner
-        let half0 = max(0.01, slice / 2 - (gap / 2 + corner) / r0)
-        let half1 = max(0.01, slice / 2 - (gap / 2 + corner) / r1)
+        let gapAngle = gap / ((inner + outer) / 2)
+        let start = mid - slice / 2 + gapAngle / 2
+        let end = mid + slice / 2 - gapAngle / 2
+        let span = max(0.05, end - start)
+        let insetOuter = min(corner / outer, span * 0.32)
+        let insetInner = min(corner / inner, span * 0.32)
 
         func point(_ radius: CGFloat, _ angle: CGFloat) -> CGPoint {
             CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
         }
 
-        var base = Path()
-        let steps = 28
-        for step in 0...steps {
-            let angle = mid - half1 + 2 * half1 * CGFloat(step) / CGFloat(steps)
-            step == 0 ? base.move(to: point(r1, angle)) : base.addLine(to: point(r1, angle))
-        }
-        for step in 0...steps {
-            let angle = mid + half0 - 2 * half0 * CGFloat(step) / CGFloat(steps)
-            base.addLine(to: point(r0, angle))
-        }
-        base.closeSubpath()
-        return base.union(base.strokedPath(StrokeStyle(lineWidth: corner * 2, lineCap: .round, lineJoin: .round)))
+        var path = Path()
+        path.move(to: point(outer, start + insetOuter))
+        path.addArc(
+            center: center,
+            radius: outer,
+            startAngle: .radians(start + insetOuter),
+            endAngle: .radians(end - insetOuter),
+            clockwise: false
+        )
+        path.addQuadCurve(to: point(outer - corner, end), control: point(outer, end))
+        path.addLine(to: point(inner + corner, end))
+        path.addQuadCurve(to: point(inner, end - insetInner), control: point(inner, end))
+        path.addArc(
+            center: center,
+            radius: inner,
+            startAngle: .radians(end - insetInner),
+            endAngle: .radians(start + insetInner),
+            clockwise: true
+        )
+        path.addQuadCurve(to: point(inner + corner, start), control: point(inner, start))
+        path.addLine(to: point(outer - corner, start))
+        path.addQuadCurve(to: point(outer, start + insetOuter), control: point(outer, start))
+        path.closeSubpath()
+        return path
+    }
+
+    private func annulus(center: CGPoint) -> Path {
+        let outerCircle = Path(ellipseIn: CGRect(x: center.x - outer, y: center.y - outer, width: outer * 2, height: outer * 2))
+        let innerCircle = Path(ellipseIn: CGRect(x: center.x - inner, y: center.y - inner, width: inner * 2, height: inner * 2))
+        return outerCircle.subtracting(innerCircle)
     }
 }
 
@@ -74,11 +92,12 @@ struct WheelFace: View {
                     let shape = WheelSegment(index: index, count: session.choices.count)
                     Color.clear
                         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
-                        .glassEffect(glass(for: index), in: shape)
+                        .glassEffect(.regular.interactive(), in: shape)
+                        .clipShape(shape)
                         .overlay {
                             shape
-                                .fill(LinearGradient(colors: [Color(hex: 0xFF8A3D), OrangeTheme.accentDeep], startPoint: .top, endPoint: .bottom))
-                                .opacity(index == highlight ? 0.92 : 0)
+                                .fill(OrangeTheme.accent)
+                                .opacity(index == highlight ? 1 : 0)
                                 .allowsHitTesting(false)
                         }
                 }
@@ -106,10 +125,6 @@ struct WheelFace: View {
         }
         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
         .animation(.spring(response: 0.26, dampingFraction: 0.72), value: highlight)
-    }
-
-    private func glass(for index: Int) -> Glass {
-        index == highlight ? .regular.tint(OrangeTheme.accent).interactive() : .regular.interactive()
     }
 }
 
@@ -209,12 +224,12 @@ enum WheelFeedback {
     }
 }
 
-/// A 20 ms decaying tick. Loud system sounds read as alerts; this stays under the interface.
+/// A dry 12 ms snap. The old tick had a low tail; this one is only the attack.
 private enum WheelTick {
     private static let clip: Data = makeWav()
     private static let player: AVAudioPlayer? = {
         let player = try? AVAudioPlayer(data: clip)
-        player?.volume = 0.2
+        player?.volume = 0.32
         player?.prepareToPlay()
         return player
     }()
@@ -228,15 +243,15 @@ private enum WheelTick {
 
     private static func makeWav() -> Data {
         let sampleRate = 44_100
-        let count = 980
+        let count = 520
         var pcm = Data(count: count * 2)
         pcm.withUnsafeMutableBytes { raw in
             let samples = raw.bindMemory(to: Int16.self)
             for index in 0..<count {
                 let time = Double(index) / Double(sampleRate)
-                let click = sin(2 * .pi * 2400 * time) * exp(-time * 280)
-                let body = sin(2 * .pi * 980 * time) * exp(-time * 140) * 0.35
-                let wave = max(-1, min(1, (click * 0.55 + body) * 0.5))
+                let burst = (Self.noise(index) * 2 - 1) * exp(-time * 1100)
+                let snap = sin(2 * .pi * 4800 * time) * exp(-time * 650)
+                let wave = max(-1, min(1, burst * 0.72 + snap * 0.4))
                 samples[index] = Int16(wave * 32_767)
             }
         }
@@ -259,5 +274,10 @@ private enum WheelTick {
         u32(UInt32(pcm.count))
         data.append(pcm)
         return data
+    }
+
+    private static func noise(_ index: Int) -> Double {
+        let value = sin(Double(index) * 12.9898) * 43758.5453
+        return value - floor(value)
     }
 }
