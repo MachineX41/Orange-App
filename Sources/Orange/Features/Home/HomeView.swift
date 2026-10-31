@@ -1,301 +1,299 @@
 import AppKit
+import OrangeKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct HomeView: View {
     @Environment(AppRuntime.self) private var runtime
-    @State private var targeted = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                header
-                if !runtime.globalMonitorAvailable {
-                    Text(Copy.monitorOff)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(OrangeTheme.ink)
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .orangeCard(radius: 16)
+            VStack(alignment: .leading, spacing: 22) {
+                PageHeader(
+                    title: "Orange",
+                    subtitle: L("Convert, edit and move files right where you drag them.", "Dosyaları sürüklediğiniz yerde dönüştürün, düzenleyin, taşıyın."),
+                    symbol: "circle.hexagongrid.fill"
+                )
+                if runtime.selection.isEmpty {
+                    DropZone()
+                } else {
+                    SelectionPanel()
                 }
-                dropWell
-                if !runtime.selection.isEmpty {
-                    selectionBar
-                }
-                legend
-                if !runtime.shelf.isEmpty {
-                    shelf
-                }
+                GestureGuide()
                 if !runtime.recentOutputs.isEmpty {
-                    recent
+                    RecentStrip(urls: runtime.recentOutputs)
                 }
             }
-            .padding(36)
-            .padding(.top, 12)
-            .frame(maxWidth: 980, alignment: .leading)
+            .padding(28)
+            .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
         }
-        .background(homeGlow)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ORANGE")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(1.6)
-                .foregroundStyle(OrangeTheme.accent)
-            Text(Copy.headlineLead)
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(OrangeTheme.ink)
-            Text(Copy.headlineAccent)
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(OrangeTheme.accent)
-            Text(Copy.subhead)
-                .font(.system(size: 15))
-                .foregroundStyle(OrangeTheme.muted)
-                .frame(maxWidth: 520, alignment: .leading)
-                .padding(.top, 4)
-        }
-    }
-
-    private var dropWell: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .strokeBorder(OrangeTheme.accent.opacity(targeted ? 0.9 : 0.35), lineWidth: 1.5)
-                    .frame(width: 72, height: 72)
-                Circle()
-                    .fill(OrangeTheme.accent)
-                    .frame(width: 10, height: 10)
-            }
-            Text(targeted ? Copy.dropActive : Copy.dropTitle)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(OrangeTheme.ink)
-            Text(Copy.dropDetail)
-                .font(.system(size: 13))
-                .foregroundStyle(OrangeTheme.muted)
-            HStack(spacing: 10) {
-                Button(Copy.openFiles) { runtime.importerPresented = true }
-                    .buttonStyle(OrangeButtonStyle(prominent: true))
-                Button(Copy.sample) { runtime.useSample() }
-                    .buttonStyle(OrangeButtonStyle(prominent: false))
-            }
-            .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 36)
-        .orangeCard(radius: 28)
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(
-                    targeted ? OrangeTheme.accent : Color.clear,
-                    style: StrokeStyle(lineWidth: 1.5, dash: [7, 6])
-                )
-        )
-        .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
-            let flags = NSEvent.modifierFlags
-            if flags.contains(.shift) || flags.contains(.command) || flags.contains(.control) {
-                return false
-            }
-            let providers = providers
-            Task {
-                var urls: [URL] = []
-                for provider in providers {
-                    let url: URL? = await withCheckedContinuation { continuation in
-                        _ = provider.loadObject(ofClass: URL.self) { object, _ in
-                            continuation.resume(returning: object)
-                        }
-                    }
-                    if let url { urls.append(url) }
-                }
-                await MainActor.run {
-                    runtime.importURLs(urls)
-                }
-            }
-            return true
-        }
-    }
-
-    private var selectionBar: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(Copy.selection)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(OrangeTheme.muted)
-                Spacer()
-                Button(Copy.clear) { runtime.selection = [] }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(OrangeTheme.muted)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(runtime.selection.prefix(10)) { file in
-                        HStack(spacing: 8) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: file.path))
-                                .resizable()
-                                .frame(width: 22, height: 22)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(file.name)
-                                    .lineLimit(1)
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text(OrangeTheme.bytes(file.byteCount))
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(OrangeTheme.muted)
-                            }
-                            Button {
-                                runtime.removeFromSelection(file)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(OrangeTheme.muted)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(OrangeTheme.canvas)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                }
-            }
-            HStack(spacing: 10) {
-                Button(Copy.convert) { runtime.presentLocalWheel(.convert) }
-                    .buttonStyle(OrangeButtonStyle(prominent: true))
-                Button(Copy.tools) { runtime.presentLocalWheel(.tools) }
-                    .buttonStyle(OrangeButtonStyle(prominent: false))
-                Button(Copy.actions) { runtime.presentLocalWheel(.actions) }
-                    .buttonStyle(OrangeButtonStyle(prominent: false))
-            }
-        }
-    }
-
-    private var legend: some View {
-        HStack(spacing: 12) {
-            legendCard(Copy.legendShift, Copy.legendConvert)
-            legendCard(Copy.legendCommand, Copy.legendTools)
-            legendCard(Copy.legendControl, Copy.legendActions)
-        }
-    }
-
-    private func legendCard(_ title: String, _ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(OrangeTheme.ink)
-            Text(detail)
-                .font(.system(size: 12))
-                .foregroundStyle(OrangeTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .orangeCard(radius: 18)
-    }
-
-    private var shelf: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(Copy.shelf)
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Text(Copy.shelfHint)
-                    .font(.system(size: 12))
-                    .foregroundStyle(OrangeTheme.muted)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(runtime.shelf) { file in
-                        Button {
-                            runtime.selection = [file]
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Image(nsImage: NSWorkspace.shared.icon(forFile: file.path))
-                                    .resizable()
-                                    .frame(width: 28, height: 28)
-                                Text(file.name)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .lineLimit(1)
-                                    .frame(width: 140, alignment: .leading)
-                            }
-                            .padding(12)
-                            .orangeCard(radius: 16)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button(Copy.remove) { runtime.removeFromShelf(file) }
-                            Button(Copy.reveal) {
-                                NSWorkspace.shared.activateFileViewerSelecting([file.url])
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var recent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(Copy.recent)
-                .font(.system(size: 13, weight: .semibold))
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 10) {
-                ForEach(runtime.recentOutputs) { file in
-                    Button {
-                        NSWorkspace.shared.activateFileViewerSelecting([file.url])
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: file.path))
-                                .resizable()
-                                .frame(width: 28, height: 28)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(file.name)
-                                    .font(.system(size: 12.5, weight: .semibold))
-                                    .lineLimit(1)
-                                Text(OrangeTheme.bytes(file.byteCount))
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(OrangeTheme.muted)
-                            }
-                            Spacer()
-                        }
-                        .padding(12)
-                        .orangeCard(radius: 16)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private var homeGlow: some View {
-        ZStack {
-            OrangeTheme.canvas
-            Circle()
-                .fill(OrangeTheme.accent.opacity(0.16))
-                .frame(width: 420, height: 420)
-                .blur(radius: 80)
-                .offset(x: 280, y: -220)
-        }
-        .ignoresSafeArea()
+        .scrollIndicators(.automatic)
     }
 }
 
-struct OrangeButtonStyle: ButtonStyle {
-    var prominent: Bool
+struct DropZone: View {
+    @Environment(AppRuntime.self) private var runtime
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(prominent ? Color.white : OrangeTheme.ink)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(prominent ? AnyShapeStyle(OrangeTheme.accent) : AnyShapeStyle(OrangeTheme.card))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(prominent ? Color.clear : OrangeTheme.line, lineWidth: 1)
-            )
-            .opacity(configuration.isPressed ? 0.82 : 1)
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "arrow.down.doc.fill")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 72, height: 72)
+                .background(OrangeTheme.accentGradient, in: Circle())
+                .shadow(color: OrangeTheme.accent.opacity(0.4), radius: 16, y: 6)
+            VStack(spacing: 5) {
+                Text(L("Drop files to begin", "Başlamak için dosya bırakın"))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                Text(L("Images, video, audio, PDFs, documents and archives", "Görsel, video, ses, PDF, belge ve arşivler"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 10) {
+                Button {
+                    runtime.openFiles()
+                } label: {
+                    Label(L("Choose Files…", "Dosya Seç…"), systemImage: "folder")
+                }
+                .buttonStyle(.glassProminent)
+                .tint(OrangeTheme.accent)
+                Button {
+                    runtime.useSample()
+                } label: {
+                    Label(L("Try a Sample", "Örnek Dene"), systemImage: "sparkles")
+                }
+                .buttonStyle(.glass).tint(nil)
+            }
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 44)
+        .glassCard(radius: 30)
+    }
+}
+
+struct SelectionPanel: View {
+    @Environment(AppRuntime.self) private var runtime
+
+    private var urls: [URL] { runtime.selection.map(\.url) }
+
+    var body: some View {
+        let targets = Catalog.commonConvertTargets(for: urls)
+        let tools = Catalog.commonTools(for: urls)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("\(runtime.selection.count) selected", "\(runtime.selection.count) seçili"))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    Text(ByteCountFormatter.string(fromByteCount: runtime.selection.reduce(0) { $0 + $1.byteCount }, countStyle: .file))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(WheelMode.allCases, id: \.self) { mode in
+                            Button {
+                                runtime.presentLocalWheel(mode)
+                            } label: {
+                                Label(mode.title, systemImage: mode.symbol)
+                            }
+                            .buttonStyle(.glass).tint(nil)
+                            .help(L("Open the \(mode.title) wheel", "\(mode.title) çarkını aç"))
+                        }
+                    }
+                }
+                Button {
+                    runtime.openFiles()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.glass).tint(nil)
+                .buttonBorderShape(.circle)
+                .help(L("Add Files", "Dosya Ekle"))
+                Button {
+                    withAnimation { runtime.selection.removeAll() }
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.glass).tint(nil)
+                .buttonBorderShape(.circle)
+                .help(L("Clear Selection", "Seçimi Temizle"))
+            }
+
+            ScrollView(.horizontal) {
+                HStack(spacing: 12) {
+                    ForEach(runtime.selection) { file in
+                        FileChip(file: file)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .scrollIndicators(.never)
+
+            if !targets.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionLabel(title: L("Convert to", "Dönüştür"), symbol: "arrow.triangle.2.circlepath")
+                    FlowLayout(spacing: 8) {
+                        ForEach(targets) { target in
+                            Button {
+                                runtime.convert(runtime.selection, to: target)
+                            } label: {
+                                Label(target.title, systemImage: target.symbol)
+                                    .font(.system(size: 12.5, weight: .semibold))
+                            }
+                            .buttonStyle(.glass).tint(nil)
+                        }
+                    }
+                }
+            }
+
+            if !tools.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionLabel(title: L("Tools", "Araçlar"), symbol: "wrench.and.screwdriver")
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                        ForEach(tools) { tool in
+                            Button {
+                                runtime.open(tool, files: runtime.selection)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: tool.symbol)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(OrangeTheme.accent)
+                                        .frame(width: 22)
+                                    Text(tool.title).font(.system(size: 13, weight: .medium))
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel(title: L("Actions", "Eylemler"), symbol: "bolt")
+                FlowLayout(spacing: 8) {
+                    ForEach(ActionID.allCases, id: \.self) { action in
+                        Button {
+                            runtime.perform(action, files: runtime.selection)
+                        } label: {
+                            Label(action.title, systemImage: action.symbol)
+                                .font(.system(size: 12.5, weight: .medium))
+                        }
+                        .buttonStyle(.glass).tint(nil)
+                    }
+                }
+            }
+        }
+        .padding(22)
+        .glassCard(radius: 28)
+    }
+}
+
+struct FileChip: View {
+    @Environment(AppRuntime.self) private var runtime
+    var file: FileRef
+
+    var body: some View {
+        VStack(spacing: 7) {
+            FileThumbnail(url: file.url, side: 86, radius: 14)
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        withAnimation { runtime.remove(file) }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 17))
+                            .foregroundStyle(.white, .black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 6, y: -6)
+                }
+            VStack(spacing: 1) {
+                Text(file.name)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(file.sizeText)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 104)
+        .onDrag { NSItemProvider(contentsOf: file.url) ?? NSItemProvider() }
+        .contextMenu {
+            Button(L("Reveal in Finder", "Finder’da Göster")) { NSWorkspace.shared.activateFileViewerSelecting([file.url]) }
+            Button(L("Open", "Aç")) { NSWorkspace.shared.open(file.url) }
+            Divider()
+            Button(L("Remove", "Kaldır")) { runtime.remove(file) }
+        }
+    }
+}
+
+struct GestureGuide: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(title: L("Drag anywhere, then hold a key", "Herhangi bir yerde sürükleyin, sonra bir tuşa basılı tutun"), symbol: "hand.draw")
+            HStack(spacing: 12) {
+                tile(.convert, L("Formats appear around your file. The wheel stays put, so just drag onto one.", "Biçimler dosyanızın etrafında belirir. Çark sabit kalır, birinin üzerine sürükleyin."))
+                tile(.tools, L("Edit, compress, trim, redact and more, opened in a focused editor.", "Düzenle, sıkıştır, kes, gizle ve fazlası, odaklı bir editörde."))
+                tile(.actions, L("Shelf, copy, move, AirDrop, zip or open in Terminal.", "Raf, kopyala, taşı, AirDrop, sıkıştır ya da Terminal’de aç."))
+            }
+        }
+    }
+
+    private func tile(_ mode: WheelMode, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                KeyCap(text: mode.key)
+                Text(mode.title).font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Image(systemName: mode.symbol).foregroundStyle(OrangeTheme.accent)
+            }
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .glassCard(radius: 20)
+    }
+}
+
+struct RecentStrip: View {
+    var urls: [URL]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(title: L("Recent results", "Son sonuçlar"), symbol: "clock")
+            ScrollView(.horizontal) {
+                HStack(spacing: 12) {
+                    ForEach(urls, id: \.self) { url in
+                        VStack(spacing: 6) {
+                            FileThumbnail(url: url, side: 78, radius: 12)
+                            Text(url.lastPathComponent)
+                                .font(.system(size: 10.5))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .frame(width: 92)
+                        .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
+                        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+                        .contextMenu {
+                            Button(L("Reveal in Finder", "Finder’da Göster")) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                            Button(L("Use as Input", "Girdi Olarak Kullan")) { AppRuntime.shared.importURLs([url]) }
+                        }
+                    }
+                }
+                .padding(14)
+            }
+            .scrollIndicators(.never)
+            .glassCard(radius: 22)
+        }
     }
 }

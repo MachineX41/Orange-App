@@ -16,30 +16,34 @@ public struct WheelLayout: Equatable, Sendable {
         self.count = count
     }
 
-    public func point(for index: Int) -> CGPoint {
-        guard count > 0 else { return center }
-        let slice = (2 * CGFloat.pi) / CGFloat(count)
-        let theta = (-CGFloat.pi / 2) + (CGFloat(index) * slice)
-        return CGPoint(
-            x: center.x + cos(theta) * ringRadius,
-            y: center.y + sin(theta) * ringRadius
-        )
+    public var sliceAngle: CGFloat {
+        count > 0 ? (2 * .pi) / CGFloat(count) : 0
     }
 
+    /// Angle of the slice's center. Index 0 sits at twelve o’clock and indexes advance clockwise on screen.
+    public func angle(for index: Int) -> CGFloat {
+        -.pi / 2 + CGFloat(index) * sliceAngle
+    }
+
+    public func point(for index: Int, radius: CGFloat? = nil) -> CGPoint {
+        guard count > 0 else { return center }
+        let theta = angle(for: index)
+        let r = radius ?? ringRadius
+        return CGPoint(x: center.x + cos(theta) * r, y: center.y + sin(theta) * r)
+    }
+
+    /// Point uses a top-left origin with y growing downward.
     public func index(at point: CGPoint) -> Int? {
         guard count > 0 else { return nil }
         let dx = point.x - center.x
         let dy = point.y - center.y
         let distance = hypot(dx, dy)
         guard distance >= innerRadius, distance <= outerRadius else { return nil }
-
-        let slice = (2 * CGFloat.pi) / CGFloat(count)
-        var delta = atan2(dy, dx) - (-CGFloat.pi / 2)
-        while delta <= -.pi { delta += 2 * .pi }
-        while delta > .pi { delta -= 2 * .pi }
-        var index = Int((delta / slice).rounded())
+        var delta = atan2(dy, dx) + .pi / 2
+        while delta < 0 { delta += 2 * .pi }
+        while delta >= 2 * .pi { delta -= 2 * .pi }
+        var index = Int((delta / sliceAngle).rounded())
         index %= count
-        if index < 0 { index += count }
         return index
     }
 }

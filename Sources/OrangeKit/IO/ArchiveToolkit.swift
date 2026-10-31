@@ -8,10 +8,6 @@ public enum ArchiveToolkit: Sendable {
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: staging) }
         for url in urls {
-            var isDir: ObjCBool = false
-            guard fileManager.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else {
-                throw OrangeError.unsupported(url.lastPathComponent)
-            }
             let copy = staging.appendingPathComponent(url.lastPathComponent)
             if fileManager.fileExists(atPath: copy.path) {
                 throw OrangeError.unsupported(url.lastPathComponent)
@@ -22,21 +18,22 @@ public enum ArchiveToolkit: Sendable {
             ? urls[0].deletingPathExtension().lastPathComponent
             : "Archive"
         let destination = UniqueDestination.url(in: directory, baseName: base, extension: "zip")
-        try runDitto(arguments: ["-c", "-k", "--norsrc", staging.path, destination.path])
+        try run("/usr/bin/ditto", ["-c", "-k", "--norsrc", staging.path, destination.path])
         return destination
     }
 
-    public static func unzip(archive: URL, into directory: URL) throws -> URL {
-        guard archive.pathExtension.lowercased() == "zip" else {
-            throw OrangeError.unsupported(archive.lastPathComponent)
-        }
+    public static func extract(archive: URL, into directory: URL) throws -> URL {
         let folder = UniqueDestination.folder(
             in: directory,
             baseName: archive.deletingPathExtension().lastPathComponent
         )
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         do {
-            try runDitto(arguments: ["-x", "-k", "--norsrc", archive.path, folder.path])
+            if archive.pathExtension.lowercased() == "zip" {
+                try run("/usr/bin/ditto", ["-x", "-k", "--norsrc", archive.path, folder.path])
+            } else {
+                try run("/usr/bin/tar", ["-xf", archive.path, "-C", folder.path])
+            }
             try rejectUnsafeEntries(in: folder)
         } catch {
             try? FileManager.default.removeItem(at: folder)
@@ -45,23 +42,24 @@ public enum ArchiveToolkit: Sendable {
         return folder
     }
 
-    private static func runDitto(arguments: [String]) throws {
+    private static func run(_ tool: String, _ arguments: [String]) throws {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = arguments
         let pipe = Pipe()
         process.standardError = pipe
+        process.standardOutput = Pipe()
         try process.run()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw OrangeError.writeFailed("zip")
+            let text = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            throw OrangeError.toolFailed(text.isEmpty ? Lang.t("The archive couldn’t be processed.", "Arşiv işlenemedi.") : text)
         }
     }
 
     private static func rejectUnsafeEntries(in folder: URL) throws {
-        let fileManager = FileManager.default
-        let root = folder.standardizedFileURL.path
-        guard let enumerator = fileManager.enumerator(
+        let root = folder.standardizedFileURL.resolvingSymlinksInPath().path
+        guard let enumerator = FileManager.default.enumerator(
             at: folder,
             includingPropertiesForKeys: [.isSymbolicLinkKey],
             options: []
@@ -73,7 +71,7 @@ public enum ArchiveToolkit: Sendable {
             if values.isSymbolicLink == true {
                 throw OrangeError.unsafeArchive
             }
-            let path = file.standardizedFileURL.path
+            let path = file.standardizedFileURL.resolvingSymlinksInPath().path
             if path != root && !path.hasPrefix(root + "/") {
                 throw OrangeError.unsafeArchive
             }

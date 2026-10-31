@@ -10,12 +10,13 @@ if [[ "${1:-}" == "--debug" ]]; then
 fi
 
 swift build -c "$config" --product Orange
+bin="$(swift build -c "$config" --show-bin-path)"
 
 app="$root/build/Orange.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$root/build/AppIcon.iconset"
 
-cp "$root/.build/$config/Orange" "$app/Contents/MacOS/Orange"
+cp "$bin/Orange" "$app/Contents/MacOS/Orange"
 cp "$root/Configuration/Info.plist" "$app/Contents/Info.plist"
 chmod +x "$app/Contents/MacOS/Orange"
 
@@ -23,5 +24,6 @@ swiftc -O -framework AppKit -framework CoreGraphics \
   "$root/scripts/RenderIcon.swift" -o "$root/build/render-icon"
 "$root/build/render-icon" "$root/build/AppIcon.iconset"
 iconutil -c icns "$root/build/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
+codesign --force --deep --sign - "$app" >/dev/null
 
 echo "Built $app"

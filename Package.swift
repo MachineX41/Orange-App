@@ -1,25 +1,29 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "Orange",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
     ],
     products: [
         .library(name: "OrangeKit", targets: ["OrangeKit"]),
         .executable(name: "Orange", targets: ["Orange"])
     ],
     targets: [
-        .target(name: "OrangeKit"),
+        .target(
+            name: "OrangeKit",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .executableTarget(
             name: "Orange",
-            dependencies: ["OrangeKit"]
+            dependencies: ["OrangeKit"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "OrangeKitTests",
-            dependencies: ["OrangeKit"]
+            dependencies: ["OrangeKit"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
-    ],
-    swiftLanguageModes: [.v6]
+    ]
 )

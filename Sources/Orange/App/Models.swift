@@ -2,16 +2,18 @@ import Foundation
 import OrangeKit
 import SwiftUI
 
-enum WheelMode: String, Sendable {
+enum WheelMode: String, CaseIterable, Sendable {
     case convert
     case tools
     case actions
 }
 
+enum ActionID: String, CaseIterable, Codable, Sendable {
+    case float, copy, move, copyPath, duplicate, reveal, airDrop, zip, openTerminal
+}
+
 enum AppearanceChoice: String, CaseIterable, Identifiable, Sendable {
-    case system
-    case light
-    case dark
+    case system, light, dark
 
     var id: String { rawValue }
 
@@ -32,38 +34,38 @@ struct FileRef: Identifiable, Hashable, Codable, Sendable {
 
     var id: String { path }
     var url: URL { URL(fileURLWithPath: path) }
+    var sizeText: String { ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file) }
+    var exists: Bool { FileManager.default.fileExists(atPath: path) }
 
     static func load(_ url: URL) -> FileRef? {
         let standardized = url.standardizedFileURL
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory),
-              !isDirectory.boolValue else {
-            return nil
-        }
+        guard FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory) else { return nil }
         let size = Int64((try? standardized.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
         return FileRef(
             path: standardized.path,
             name: standardized.lastPathComponent,
-            kind: Catalog.kind(for: standardized),
+            kind: isDirectory.boolValue ? .other : Catalog.kind(for: standardized),
             byteCount: size
         )
     }
 }
 
 struct WheelChoice: Identifiable, Hashable {
-    var id: String
-    var title: String
-    var symbol: String
-    var payload: Payload
-
     enum Payload: Hashable {
         case convert(ConvertTarget)
         case tool(ToolID)
         case action(ActionID)
+        case more
     }
+
+    var id: String
+    var title: String
+    var symbol: String
+    var payload: Payload
 }
 
-struct WheelSession: Identifiable {
+struct WheelSession: Identifiable, Equatable {
     let id = UUID()
     var mode: WheelMode
     var files: [FileRef]
@@ -72,45 +74,38 @@ struct WheelSession: Identifiable {
     var signature: String {
         mode.rawValue + "|" + files.map(\.path).joined(separator: "|")
     }
-}
 
-enum SheetRoute: Identifiable {
-    case compress([FileRef])
-    case resize(FileRef)
-    case crop(FileRef)
-    case rotate(FileRef)
-    case split(FileRef)
-
-    var id: String {
-        switch self {
-        case .compress(let files): "compress-\(files.map(\.path).joined(separator: "|"))"
-        case .resize(let file): "resize-\(file.path)"
-        case .crop(let file): "crop-\(file.path)"
-        case .rotate(let file): "rotate-\(file.path)"
-        case .split(let file): "split-\(file.path)"
-        }
-    }
+    static func == (lhs: WheelSession, rhs: WheelSession) -> Bool { lhs.id == rhs.id }
 }
 
 enum JobState: String, Codable, Sendable {
-    case running
-    case success
-    case failure
+    case running, success, failure
 }
 
 struct JobRecord: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var title: String
     var detail: String
+    var symbol: String
     var createdAt: Date
     var state: JobState
     var outputPaths: [String]
 }
 
-enum Section: String, CaseIterable, Identifiable {
+enum AppSection: Hashable, Identifiable {
     case home
     case library
-    case tools
+    case download
+    case shelf
+    case tools(MediaKind)
 
-    var id: String { rawValue }
+    var id: String {
+        switch self {
+        case .home: "home"
+        case .library: "library"
+        case .download: "download"
+        case .shelf: "shelf"
+        case .tools(let kind): "tools-\(kind.rawValue)"
+        }
+    }
 }

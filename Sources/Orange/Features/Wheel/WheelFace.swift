@@ -1,343 +1,228 @@
-import AppKit
 import OrangeKit
 import SwiftUI
 
 enum WheelMetrics {
-    static let size: CGFloat = 440
-    static let ring: CGFloat = 150
-    static let inner: CGFloat = 78
+    static let size: CGFloat = 470
     static let outer: CGFloat = 214
+    static let inner: CGFloat = 98
+    static let gap: CGFloat = 7
+    static let corner: CGFloat = 16
+
+    static func layout(count: Int, in size: CGSize = CGSize(width: WheelMetrics.size, height: WheelMetrics.size)) -> WheelLayout {
+        WheelLayout(
+            center: CGPoint(x: size.width / 2, y: size.height / 2),
+            ringRadius: (outer + inner) / 2,
+            innerRadius: inner - 6,
+            outerRadius: outer + 40,
+            count: count
+        )
+    }
+}
+
+/// Annular sector with rounded corners. Index 0 is centered at twelve o’clock.
+struct WheelSegment: Shape {
+    var index: Int
+    var count: Int
+    var inner: CGFloat = WheelMetrics.inner
+    var outer: CGFloat = WheelMetrics.outer
+    var gap: CGFloat = WheelMetrics.gap
+    var corner: CGFloat = WheelMetrics.corner
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        guard count > 1 else {
+            let ring = Path(ellipseIn: CGRect(x: center.x - outer, y: center.y - outer, width: outer * 2, height: outer * 2))
+            return ring.subtracting(Path(ellipseIn: CGRect(x: center.x - inner, y: center.y - inner, width: inner * 2, height: inner * 2)))
+        }
+        let slice = 2 * CGFloat.pi / CGFloat(count)
+        let mid = -CGFloat.pi / 2 + CGFloat(index) * slice
+        let r0 = inner + corner
+        let r1 = outer - corner
+        let half0 = max(0.01, slice / 2 - (gap / 2 + corner) / r0)
+        let half1 = max(0.01, slice / 2 - (gap / 2 + corner) / r1)
+
+        func point(_ radius: CGFloat, _ angle: CGFloat) -> CGPoint {
+            CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
+        }
+
+        var base = Path()
+        let steps = 28
+        for step in 0...steps {
+            let angle = mid - half1 + 2 * half1 * CGFloat(step) / CGFloat(steps)
+            step == 0 ? base.move(to: point(r1, angle)) : base.addLine(to: point(r1, angle))
+        }
+        for step in 0...steps {
+            let angle = mid + half0 - 2 * half0 * CGFloat(step) / CGFloat(steps)
+            base.addLine(to: point(r0, angle))
+        }
+        base.closeSubpath()
+        return base.union(base.strokedPath(StrokeStyle(lineWidth: corner * 2, lineCap: .round, lineJoin: .round)))
+    }
 }
 
 struct WheelFace: View {
     var session: WheelSession
     var highlight: Int?
-    var interactive: Bool
-    var onHighlight: (Int) -> Void
-    var onCommit: (Int) -> Void
 
-    private var layout: WheelLayout {
-        WheelLayout(
-            center: CGPoint(x: WheelMetrics.size / 2, y: WheelMetrics.size / 2),
-            ringRadius: WheelMetrics.ring,
-            innerRadius: WheelMetrics.inner,
-            outerRadius: WheelMetrics.outer,
-            count: session.choices.count
-        )
-    }
+    private var layout: WheelLayout { WheelMetrics.layout(count: session.choices.count) }
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(.ultraThinMaterial)
-                .frame(width: 392, height: 392)
-                .overlay(Circle().strokeBorder(OrangeTheme.line, lineWidth: 1))
-                .shadow(color: .black.opacity(0.18), radius: 30, y: 16)
-
-            Circle()
-                .strokeBorder(OrangeTheme.line, lineWidth: 1)
-                .frame(width: WheelMetrics.ring * 2, height: WheelMetrics.ring * 2)
-
-            centerDisc
+            GlassEffectContainer(spacing: 10) {
+                ZStack {
+                    ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, _ in
+                        let shape = WheelSegment(index: index, count: session.choices.count)
+                        Color.clear
+                            .frame(width: WheelMetrics.size, height: WheelMetrics.size)
+                            .glassEffect(glass(for: index), in: shape)
+                            .overlay {
+                                shape.fill(LinearGradient(colors: [Color(hex: 0xFF8A3D), OrangeTheme.accentDeep], startPoint: .top, endPoint: .bottom))
+                                    .opacity(index == highlight ? 1 : 0)
+                            }
+                            .overlay {
+                                shape.stroke(
+                                    LinearGradient(colors: [.white.opacity(index == highlight ? 0.7 : 0.38), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom),
+                                    lineWidth: 1
+                                )
+                            }
+                    }
+                    Color.clear
+                        .frame(width: WheelMetrics.size, height: WheelMetrics.size)
+                        .glassEffect(.regular.tint(.black.opacity(0.28)), in: Circle().inset(by: WheelMetrics.size / 2 - WheelMetrics.inner + 12))
+                        .overlay {
+                            Circle().inset(by: WheelMetrics.size / 2 - WheelMetrics.inner + 12)
+                                .stroke(.white.opacity(0.22), lineWidth: 1)
+                        }
+                }
+            }
+            .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
 
             ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, choice in
-                bubble(choice, selected: highlight == index)
-                    .position(layout.point(for: index))
-                    .onHover { inside in
-                        guard interactive, inside else { return }
-                        onHighlight(index)
-                    }
-                    .onTapGesture {
-                        guard interactive else { return }
-                        onCommit(index)
-                    }
-                    .allowsHitTesting(interactive)
+                let selected = index == highlight
+                VStack(spacing: 6) {
+                    Image(systemName: choice.symbol)
+                        .font(.system(size: 22, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                    Text(choice.title.uppercased(with: .current))
+                        .font(.system(size: 10.5, weight: .bold))
+                        .tracking(0.6)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .foregroundStyle(.white.opacity(selected ? 1 : 0.92))
+                .shadow(color: .black.opacity(selected ? 0.2 : 0.35), radius: 2, y: 1)
+                .frame(width: 84)
+                .scaleEffect(selected ? 1.12 : 1)
+                .position(layout.point(for: index))
             }
+
+            WheelCenter(session: session)
         }
         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: highlight)
+        .animation(.spring(response: 0.26, dampingFraction: 0.72), value: highlight)
     }
 
-    private var centerDisc: some View {
-        VStack(spacing: 4) {
-            Text(Copy.modeTitle(session.mode).uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.1)
-                .foregroundStyle(OrangeTheme.muted)
-            Text(centerTitle)
-                .font(.system(size: 16, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(OrangeTheme.ink)
-                .lineLimit(2)
-            Text(Copy.count(session.files.count))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(OrangeTheme.muted)
-        }
-        .padding(12)
-        .frame(width: 132, height: 132)
-        .background(Circle().fill(OrangeTheme.card))
-        .overlay(Circle().strokeBorder(OrangeTheme.line, lineWidth: 1))
-    }
-
-    private var centerTitle: String {
-        if let highlight, session.choices.indices.contains(highlight) {
-            return session.choices[highlight].title
-        }
-        return session.files.count == 1 ? session.files[0].name : Copy.modeTitle(session.mode)
-    }
-
-    private func bubble(_ choice: WheelChoice, selected: Bool) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: choice.symbol)
-                .font(.system(size: 14, weight: .semibold))
-            Text(choice.title)
-                .font(.system(size: 10.5, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .foregroundStyle(selected ? Color.white : OrangeTheme.ink)
-        .frame(width: 78, height: 58)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(selected ? AnyShapeStyle(OrangeTheme.accent) : AnyShapeStyle(OrangeTheme.card))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(selected ? Color.white.opacity(0.25) : OrangeTheme.line, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(selected ? 0.2 : 0.08), radius: selected ? 14 : 8, y: 6)
-        .scaleEffect(selected ? 1.06 : 1)
+    private func glass(for index: Int) -> Glass {
+        index == highlight ? .regular.tint(OrangeTheme.accent).interactive() : .regular.tint(.black.opacity(0.34)).interactive()
     }
 }
 
-struct WheelOverlay: View {
+struct WheelCenter: View {
+    var session: WheelSession
+
+    var body: some View {
+        VStack(spacing: 7) {
+            Label(session.mode.title.uppercased(with: .current), systemImage: session.mode.symbol)
+                .font(.system(size: 9.5, weight: .heavy))
+                .tracking(0.8)
+                .foregroundStyle(OrangeTheme.ember)
+            ZStack(alignment: .topTrailing) {
+                if let first = session.files.first {
+                    FileThumbnail(url: first.url, side: 66, radius: 12)
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                }
+                if session.files.count > 1 {
+                    Text("\(session.files.count)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(OrangeTheme.accent, in: Capsule())
+                        .offset(x: 8, y: -6)
+                }
+            }
+            Text(ByteCountFormatter.string(fromByteCount: session.files.reduce(0) { $0 + $1.byteCount }, countStyle: .file))
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .glassEffect(.regular, in: Capsule())
+        }
+        .frame(width: WheelMetrics.inner * 2 - 24)
+    }
+}
+
+/// Click-driven wheel shown inside the main window.
+struct LocalWheelOverlay: View {
     @Environment(AppRuntime.self) private var runtime
-    @FocusState private var focused: Bool
+    var session: WheelSession
+    @State var highlight: Int?
+    @State var appeared = false
+    @FocusState var focused: Bool
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.black.opacity(0.28))
+            Color.black.opacity(0.18)
                 .ignoresSafeArea()
                 .onTapGesture { runtime.localWheel = nil }
-            if let session = runtime.localWheel {
-                VStack(spacing: 16) {
-                    WheelFace(
-                        session: session,
-                        highlight: runtime.localHighlight,
-                        interactive: true,
-                        onHighlight: { runtime.localHighlight = $0 },
-                        onCommit: { index in
-                            guard session.choices.indices.contains(index) else { return }
-                            runtime.commit(choice: session.choices[index], files: session.files)
+            WheelFace(session: session, highlight: highlight)
+                .contentShape(Circle())
+                .onContinuousHover(coordinateSpace: .local) { phase in
+                    switch phase {
+                    case .active(let point):
+                        let index = WheelMetrics.layout(count: session.choices.count).index(at: point)
+                        if index != highlight, index != nil, runtime.hapticOnWheel {
+                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                         }
-                    )
-                    Text(Copy.wheelHelp)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.86))
+                        highlight = index
+                    case .ended:
+                        break
+                    }
                 }
-            }
+                .onTapGesture(coordinateSpace: .local) { point in
+                    if let index = WheelMetrics.layout(count: session.choices.count).index(at: point) {
+                        runtime.commit(session.choices[index], files: session.files)
+                    } else {
+                        runtime.localWheel = nil
+                    }
+                }
+                .scaleEffect(appeared ? 1 : 0.86)
+                .opacity(appeared ? 1 : 0)
         }
         .focusable()
+        .focusEffectDisabled()
         .focused($focused)
-        .onAppear { focused = true }
         .onKeyPress(.escape) {
             runtime.localWheel = nil
             return .handled
         }
+        .onKeyPress(.rightArrow) { step(1) }
+        .onKeyPress(.downArrow) { step(1) }
+        .onKeyPress(.leftArrow) { step(-1) }
+        .onKeyPress(.upArrow) { step(-1) }
         .onKeyPress(.return) {
-            runtime.commitLocalHighlight()
+            if let highlight { runtime.commit(session.choices[highlight], files: session.files) }
             return .handled
         }
-        .onKeyPress(.leftArrow) {
-            runtime.nudgeLocalHighlight(-1)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            runtime.nudgeLocalHighlight(1)
-            return .handled
-        }
-        .onExitCommand { runtime.localWheel = nil }
-    }
-}
-
-struct GlobalWheelHost: View {
-    @Environment(AppRuntime.self) private var runtime
-
-    var body: some View {
-        if let session = runtime.globalWheel {
-            WheelFace(
-                session: session,
-                highlight: runtime.globalHighlight,
-                interactive: false,
-                onHighlight: { _ in },
-                onCommit: { _ in }
-            )
-        } else {
-            Color.clear
-        }
-    }
-}
-
-@MainActor
-final class WheelPanelController {
-    private var panel: NSPanel?
-    var frame: CGRect? { panel?.frame }
-
-    func show() {
-        let panel = self.panel ?? make()
-        self.panel = panel
-        let mouse = NSEvent.mouseLocation
-        let size = WheelMetrics.size
-        var origin = CGPoint(x: mouse.x - size / 2, y: mouse.y - size / 2)
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
-            let visible = screen.visibleFrame
-            origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size - 8)
-            origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size - 8)
-        }
-        panel.setFrame(CGRect(origin: origin, size: CGSize(width: size, height: size)), display: true)
-        if !panel.isVisible {
-            panel.orderFrontRegardless()
+        .onAppear {
+            focused = true
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { appeared = true }
         }
     }
 
-    func hide() {
-        panel?.orderOut(nil)
-    }
-
-    private func make() -> NSPanel {
-        let size = WheelMetrics.size
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: size, height: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.level = .popUpMenu
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.hidesOnDeactivate = false
-        panel.ignoresMouseEvents = true
-        panel.hasShadow = false
-        let host = NSHostingView(rootView: GlobalWheelHost().environment(AppRuntime.shared))
-        host.frame = NSRect(x: 0, y: 0, width: size, height: size)
-        panel.contentView = host
-        return panel
-    }
-}
-
-@MainActor
-final class DragWheelMonitor {
-    static let shared = DragWheelMonitor()
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
-    private var tracking = false
-    private var cached: [URL] = []
-    private let panel = WheelPanelController()
-
-    func start() {
-        let mask: NSEvent.EventTypeMask = [.leftMouseDragged, .leftMouseUp, .flagsChanged]
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { event in
-            MainActor.assumeIsolated {
-                DragWheelMonitor.shared.handle(event)
-            }
-        }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { event in
-            MainActor.assumeIsolated {
-                DragWheelMonitor.shared.handle(event)
-            }
-            return event
-        }
-        AppRuntime.shared.globalMonitorAvailable = globalMonitor != nil
-    }
-
-    private func handle(_ event: NSEvent) {
-        let runtime = AppRuntime.shared
-        if runtime.localWheel != nil {
-            end()
-            return
-        }
-        switch event.type {
-        case .leftMouseUp:
-            if tracking { commit() }
-            end()
-        case .leftMouseDragged:
-            follow(event)
-        case .flagsChanged where tracking:
-            if mode(from: event.modifierFlags) == nil {
-                end()
-            } else {
-                follow(event)
-            }
-        default:
-            break
-        }
-    }
-
-    private func follow(_ event: NSEvent) {
-        guard NSEvent.pressedMouseButtons & 1 == 1 else { return }
-        let flags = event.modifierFlags.union(NSEvent.modifierFlags)
-        guard let wheelMode = mode(from: flags) else { return }
-        let found = readDragURLs()
-        if !found.isEmpty { cached = found }
-        guard !cached.isEmpty else { return }
-        tracking = true
-        let runtime = AppRuntime.shared
-        panel.show()
-        runtime.updateGlobalWheel(files: cached, mode: wheelMode, highlight: nil)
-        runtime.updateGlobalWheel(files: cached, mode: wheelMode, highlight: highlight())
-    }
-
-    private func commit() {
-        let runtime = AppRuntime.shared
-        guard let session = runtime.globalWheel,
-              let index = runtime.globalHighlight,
-              session.choices.indices.contains(index) else { return }
-        runtime.commit(choice: session.choices[index], files: session.files)
-    }
-
-    private func end() {
-        tracking = false
-        cached = []
-        AppRuntime.shared.clearGlobalWheel()
-        panel.hide()
-    }
-
-    private func highlight() -> Int? {
-        guard let session = AppRuntime.shared.globalWheel, let frame = panel.frame else { return nil }
-        let mouse = NSEvent.mouseLocation
-        let local = CGPoint(x: mouse.x - frame.minX, y: frame.maxY - mouse.y)
-        let layout = WheelLayout(
-            center: CGPoint(x: WheelMetrics.size / 2, y: WheelMetrics.size / 2),
-            ringRadius: WheelMetrics.ring,
-            innerRadius: WheelMetrics.inner,
-            outerRadius: WheelMetrics.outer,
-            count: session.choices.count
-        )
-        return layout.index(at: local)
-    }
-
-    private func mode(from flags: NSEvent.ModifierFlags) -> WheelMode? {
-        if flags.contains(.control) { return .actions }
-        if flags.contains(.command) { return .tools }
-        if flags.contains(.shift) { return .convert }
-        return nil
-    }
-
-    private func readDragURLs() -> [URL] {
-        let pasteboard = NSPasteboard(name: .drag)
-        var urls: [URL] = []
-        if let items = pasteboard.pasteboardItems {
-            for item in items {
-                if let value = item.string(forType: .fileURL), let url = URL(string: value), url.isFileURL {
-                    urls.append(url)
-                }
-            }
-        }
-        if urls.isEmpty, let objects = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
-            urls = objects.filter(\.isFileURL)
-        }
-        return urls
+    private func step(_ delta: Int) -> KeyPress.Result {
+        let count = session.choices.count
+        highlight = ((highlight ?? (delta > 0 ? -1 : 0)) + delta + count) % count
+        return .handled
     }
 }
