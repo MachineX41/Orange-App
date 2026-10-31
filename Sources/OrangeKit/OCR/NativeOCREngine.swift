@@ -164,6 +164,11 @@ public actor NativeOCREngine: OCREngine {
         }
     }
 
+    /// Test-only: terminate the helper immediately.
+    func shutdownForTests() {
+        stopHelper()
+    }
+
     private func stopHelper() {
         guard let process, process.isRunning else {
             self.process = nil

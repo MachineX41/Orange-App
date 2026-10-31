@@ -178,7 +178,9 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     common_params params;
     params.model.path = modelPath;
     params.mmproj.path = projectorPath;
-    params.n_ctx = 0;  // 0 = model-trained context
+    // Cap context: trained 131K would need ~30GB KV cache on a 17GB Mac.
+    // 8192 covers a full OCR page with headroom; overflow guard, not a target.
+    params.n_ctx = contextTokens > 0 ? std::min(contextTokens, 8192) : 8192;
     params.n_batch = 2048;
     params.n_ubatch = 512;
     (void)contextTokens;

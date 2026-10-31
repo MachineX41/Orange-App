@@ -37,6 +37,36 @@ enum OCRFixtures {
         }
     }
 
+    static func loadCGImage(_ url: URL) throws -> CGImage {
+        try ImageEngine.load(url)
+    }
+
+    static func blankCGImage() throws -> CGImage {
+        try blankImage()
+    }
+
+    /// Synthetic receipt with exact fields the matrix asserts on.
+    static func receiptImage(in directory: URL) throws -> URL {
+        let text = "STORE 12345\nITEM A x2 17.50\nTOTAL 35.00"
+        let image = try textImage(text, size: CGSize(width: 1200, height: 500))
+        return try savePNG(image, to: directory, name: "receipt.png")
+    }
+
+    /// N-page raster-only PDF, each page labeled; no embedded text layer.
+    static func labeledPDF(pages: [String], in directory: URL) throws -> URL {
+        let url = directory.appendingPathComponent("labeled-\(pages.count).pdf")
+        let document = PDFDocument()
+        for (index, label) in pages.enumerated() {
+            let png = try savePNG(textImage(label), to: directory, name: "label-\(index).png")
+            guard let nsImage = NSImage(contentsOf: png), let page = PDFPage(image: nsImage) else {
+                throw OrangeError.writeFailed(label)
+            }
+            document.insert(page, at: index)
+        }
+        guard document.write(to: url) else { throw OrangeError.writeFailed(url.lastPathComponent) }
+        return url
+    }
+
     static func savePNG(_ image: CGImage, to directory: URL, name: String) throws -> URL {
         let url = directory.appendingPathComponent(name)
         try ImageEngine.write(image, to: url, as: .png, quality: 1.0)
