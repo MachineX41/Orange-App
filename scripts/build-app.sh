@@ -1,0 +1,27 @@
+#!/bin/zsh
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+config="release"
+if [[ "${1:-}" == "--debug" ]]; then
+  config="debug"
+fi
+
+swift build -c "$config" --product Orange
+
+app="$root/build/Orange.app"
+rm -rf "$app"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$root/build/AppIcon.iconset"
+
+cp "$root/.build/$config/Orange" "$app/Contents/MacOS/Orange"
+cp "$root/Configuration/Info.plist" "$app/Contents/Info.plist"
+chmod +x "$app/Contents/MacOS/Orange"
+
+swiftc -O -framework AppKit -framework CoreGraphics \
+  "$root/scripts/RenderIcon.swift" -o "$root/build/render-icon"
+"$root/build/render-icon" "$root/build/AppIcon.iconset"
+iconutil -c icns "$root/build/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
+
+echo "Built $app"
