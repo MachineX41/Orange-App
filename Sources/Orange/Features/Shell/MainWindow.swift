@@ -18,6 +18,10 @@ struct MainWindow: View {
     @State private var settled: Bool
     @State private var transitioning = false
     @State private var panelTarget: NSRect = .zero
+    @State private var assemblyMounted = false
+    @State private var assemblySlices = 0
+    @State private var assemblyLit = false
+    @State private var assemblyExiting = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init() {
@@ -45,6 +49,10 @@ struct MainWindow: View {
                     .opacity(tourVisible ? 1 : 0)
                     .scaleEffect(tourVisible ? 1 : 0.965, anchor: .center)
                     .allowsHitTesting(tourVisible)
+            }
+            if assemblyMounted {
+                PanelAssembly(revealed: assemblySlices, lit: assemblyLit, exiting: assemblyExiting)
+                    .allowsHitTesting(false)
             }
         }
         .animation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.62, dampingFraction: 0.9), value: tourVisible)
@@ -162,17 +170,38 @@ struct MainWindow: View {
             return
         }
         transitioning = true
-        host?.title = "Orange"
-        host?.titleVisibility = .visible
-        host?.titlebarAppearsTransparent = false
-        withAnimation(.easeIn(duration: 0.45)) { tourVisible = false }
-        withAnimation(.spring(response: 0.78, dampingFraction: 0.88)) { panelVisible = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+        assemblySlices = 0
+        assemblyLit = false
+        assemblyExiting = false
+        assemblyMounted = true
+        withAnimation(.easeIn(duration: 0.32)) { tourVisible = false }
+
+        let first = 0.26
+        let step = 0.075
+        for index in 0..<PanelAssembly.sliceCount {
+            DispatchQueue.main.asyncAfter(deadline: .now() + first + Double(index) * step) {
+                withAnimation(.spring(response: 0.46, dampingFraction: 0.7)) { assemblySlices = index + 1 }
+            }
+        }
+        let built = first + Double(PanelAssembly.sliceCount) * step + 0.12
+        DispatchQueue.main.asyncAfter(deadline: .now() + built) {
+            withAnimation(.easeOut(duration: 0.3)) { assemblyLit = true }
+        }
+        let open = built + 0.32
+        DispatchQueue.main.asyncAfter(deadline: .now() + open) {
+            host?.title = "Orange"
+            host?.titleVisibility = .visible
+            host?.titlebarAppearsTransparent = false
+            tourMounted = false
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.9)) { assemblyExiting = true }
+            withAnimation(.spring(response: 0.82, dampingFraction: 0.88)) { panelVisible = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + open + 0.45) {
             withAnimation(.easeOut(duration: 0.3)) { chromeReady = true }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + open + 0.95) {
             settled = true
-            tourMounted = false
+            assemblyMounted = false
             transitioning = false
             if let host, host.frame.width < 1100 {
                 host.setFrame(frame(fittingContent: NSSize(width: 1200, height: 800), in: host), display: true, animate: true)
@@ -285,6 +314,43 @@ struct MainWindow: View {
         case .shelf: ShelfView()
         case .tools(let kind): ToolsView(kind: kind)
         }
+    }
+}
+
+/// The wheel builds itself slice by slice after the tour, lights up, then opens outward into the panel.
+private struct PanelAssembly: View {
+    static let sliceCount = 8
+    var revealed: Int
+    var lit: Bool
+    var exiting: Bool
+    @Environment(\.colorScheme) private var scheme
+
+    private var restFill: Color { scheme == .dark ? Color.white.opacity(0.13) : Color.black.opacity(0.1) }
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<Self.sliceCount, id: \.self) { index in
+                let shown = index < revealed
+                let latest = index == revealed - 1 && !lit
+                let shape = WheelSegment(index: index, count: Self.sliceCount)
+                shape
+                    .fill(lit ? AnyShapeStyle(OrangeTheme.accentGradient) : AnyShapeStyle(latest ? OrangeTheme.accent : restFill))
+                    .overlay(shape.stroke(Color.white.opacity(scheme == .dark ? 0.08 : 0.35), lineWidth: 1))
+                    .frame(width: WheelMetrics.size, height: WheelMetrics.size)
+                    .scaleEffect(shown ? 1 : 0.42)
+                    .opacity(shown ? 1 : 0)
+                    .animation(.easeOut(duration: 0.25).delay(lit ? Double(index) * 0.025 : 0), value: lit)
+            }
+            OrangeMark(side: 72)
+                .shadow(color: OrangeTheme.accent.opacity(lit ? 0.45 : 0.18), radius: lit ? 26 : 12)
+                .scaleEffect(revealed > 0 ? 1 : 0.6)
+                .opacity(revealed > 0 ? 1 : 0)
+        }
+        .frame(width: WheelMetrics.size, height: WheelMetrics.size)
+        .scaleEffect(exiting ? 2.4 : 1)
+        .opacity(exiting ? 0 : 1)
+        .blur(radius: exiting ? 8 : 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
