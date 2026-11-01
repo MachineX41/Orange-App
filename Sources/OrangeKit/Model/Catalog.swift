@@ -17,7 +17,7 @@ public enum MediaKind: String, Codable, Sendable, CaseIterable, Identifiable {
 
 public enum ConvertTarget: String, Codable, Sendable, CaseIterable, Identifiable {
     case jpeg, png, heic, webp, avif, tiff, bmp, gif
-    case pdf, txt, docx, rtf, html, odt
+    case pdf, txt, md, docx, rtf, html, odt
     case mp4, mov, m4v
     case m4a, wav, aiff
 
@@ -160,7 +160,7 @@ public enum Catalog {
         case .audio:
             list = [.m4a, .wav, .aiff]
         case .pdf:
-            list = [.png, .jpeg, .webp, .txt, .docx, .rtf]
+            list = [.png, .jpeg, .webp, .txt, .md, .docx, .rtf]
         case .document:
             list = [.pdf, .docx, .rtf, .html, .odt, .txt]
         case .archive, .other:

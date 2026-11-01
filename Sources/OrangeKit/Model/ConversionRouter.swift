@@ -22,6 +22,13 @@ public enum ConversionRouter {
                 return try PDFToolkit.toImages(url: url, format: target, progress: progress)
             case .txt:
                 return [try writeText(try await PDFToolkit.text(of: url, progress: progress), beside: url)]
+            case .md:
+                var options = OCROptions.appleDefault
+                options.mode = .document
+                let result = try await OCRService.shared.recognize(url: url, options: options, progress: progress)
+                let markdown = result.pages.compactMap { $0.content.markdown ?? $0.content.text }.joined(separator: "\n\n---\n\n")
+                guard !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw OrangeError.nothingFound }
+                return [try writeText(markdown, beside: url, ext: "md")]
             default:
                 return [try await DocumentConverter.convert(url, to: target)]
             }
@@ -32,11 +39,11 @@ public enum ConversionRouter {
         }
     }
 
-    static func writeText(_ text: String, beside url: URL) throws -> URL {
+    static func writeText(_ text: String, beside url: URL, ext: String = "txt") throws -> URL {
         let destination = UniqueDestination.url(
             in: OutputLocation.directory(beside: url),
             baseName: OutputLocation.baseName(url),
-            extension: "txt"
+            extension: ext
         )
         do {
             try text.write(to: destination, atomically: true, encoding: .utf8)

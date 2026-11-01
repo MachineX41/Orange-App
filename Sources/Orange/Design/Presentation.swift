@@ -60,6 +60,7 @@ extension ConvertTarget {
         case .gif: "photo.stack"
         case .pdf: "doc.richtext"
         case .txt: "text.alignleft"
+        case .md: "text.badge.checkmark"
         case .docx, .odt: "doc.text"
         case .rtf: "doc.plaintext"
         case .html: "chevron.left.forwardslash.chevron.right"
