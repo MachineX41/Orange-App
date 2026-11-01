@@ -32,7 +32,12 @@ final class AppRuntime {
     var globalHighlight: Int?
     var localWheel: WheelSession?
 
-    var appearance: AppearanceChoice { didSet { save() } }
+    var appearance: AppearanceChoice {
+        didSet {
+            save()
+            FloatShelf.shared.applyAppearance()
+        }
+    }
     var language: LanguageChoice {
         didSet {
             Lang.choice = language
