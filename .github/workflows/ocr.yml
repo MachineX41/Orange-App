@@ -1,0 +1,43 @@
+name: ocr
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: read
+  pull-requests: read
+
+jobs:
+  ocr-unit-tests:
+    name: ocr-unit-tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (no model downloads)
+        run: |
+          mkdir -p build
+          swift test --xunit-output build/ocr-unit.xml
+      - name: Upload unit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-unit-xml
+          path: build/ocr-unit.xml
+
+  ocr-bundle-smoke:
+    name: ocr-bundle-smoke
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native runtime
+        run: ./scripts/build-ocr-runtime.sh
+      - name: Build app bundle
+        run: ./scripts/build-app.sh
+      - name: Helper capabilities
+        run: build/Orange.app/Contents/Helpers/OrangeOCRHelper --capabilities
+      - name: Codesign check
+        run: codesign --verify --deep --strict build/Orange.app
+      - name: No dev-machine dylibs
+        run: otool -L build/Orange.app/Contents/Helpers/OrangeOCRHelper

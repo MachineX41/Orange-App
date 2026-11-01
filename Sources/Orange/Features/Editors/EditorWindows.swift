@@ -112,6 +112,9 @@ struct EditorRoot: View {
         case .audioToVideo: AudioToVideoEditor(url: files[0])
         case .removeBackground, .imagesToPDF, .compressPDF, .muteVideo, .unzip:
             EmptyHint(symbol: editor.tool.symbol, title: editor.tool.title, message: "")
+        case .recognizeText:
+            // Routed to the OCR workspace; never a separate editor window.
+            EmptyView()
         }
     }
 }

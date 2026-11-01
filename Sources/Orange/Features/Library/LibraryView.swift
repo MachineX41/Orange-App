@@ -72,16 +72,31 @@ struct JobRow: View {
                     .frame(width: 90)
                     .tint(OrangeTheme.accent)
                     .animation(.easeOut(duration: 0.2), value: progress ?? 0)
+                if AppRuntime.shared.canCancel(job.id) {
+                    Button {
+                        AppRuntime.shared.cancelJob(job.id)
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.glass).tint(nil)
+                    .buttonBorderShape(.circle)
+                    .help(L("Cancel", "İptal"))
+                    .accessibilityLabel(L("Cancel", "İptal"))
+                }
+            case .cancelled:
+                Image(systemName: "xmark.circle").foregroundStyle(.secondary)
             case .success:
                 Text(job.createdAt, style: .relative).font(.caption).foregroundStyle(.secondary)
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting(outputs)
-                } label: {
-                    Image(systemName: "magnifyingglass")
+                if !outputs.isEmpty {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting(outputs)
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .buttonStyle(.glass).tint(nil)
+                    .buttonBorderShape(.circle)
+                    .help(L("Reveal in Finder", "Finder’da Göster"))
                 }
-                .buttonStyle(.glass).tint(nil)
-                .buttonBorderShape(.circle)
-                .help(L("Reveal in Finder", "Finder’da Göster"))
             case .failure:
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(OrangeTheme.ember)
             }

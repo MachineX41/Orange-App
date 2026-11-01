@@ -13,6 +13,7 @@ struct MainWindow: View {
             List {
                 Section {
                     SidebarItem(section: .home, title: L("Home", "Ana Sayfa"), symbol: "house", namespace: sidebarSelection)
+                    SidebarItem(section: .ocr, title: L("Text (OCR)", "Metin (OCR)"), symbol: "text.viewfinder", namespace: sidebarSelection)
                     SidebarItem(section: .download, title: L("Download", "İndir"), symbol: "arrow.down", namespace: sidebarSelection)
                     SidebarItem(section: .library, title: L("Library", "Kitaplık"), symbol: "clock", namespace: sidebarSelection)
                     SidebarItem(section: .shelf, title: L("Shelf", "Raf"), symbol: "tray", badge: runtime.shelf.count, namespace: sidebarSelection)
@@ -47,6 +48,15 @@ struct MainWindow: View {
                 }
             }
             .dropDestination(for: URL.self) { urls, _ in
+                if runtime.section == .ocr {
+                    let supported = urls.filter { [.image, .pdf].contains(Catalog.kind(for: $0)) }
+                    guard !supported.isEmpty else {
+                        runtime.toast(L("Text (OCR)", "Metin (OCR)"), L("Only images and PDFs can be used here.", "Burada yalnızca görsel ve PDF kullanılabilir."), symbol: "text.viewfinder", style: .info)
+                        return false
+                    }
+                    runtime.ocrWorkspace.add(urls: supported)
+                    return true
+                }
                 runtime.importURLs(urls)
                 return !urls.isEmpty
             } isTargeted: { dropTargeted = $0 }
@@ -89,6 +99,7 @@ struct MainWindow: View {
     @ViewBuilder private var detail: some View {
         switch runtime.section {
         case .home: HomeView()
+        case .ocr: OCRWorkspace()
         case .download: DownloadView()
         case .library: LibraryView()
         case .shelf: ShelfView()

@@ -31,7 +31,8 @@ struct ShortcutsSheet: View {
                 Item(keys: ["⌘", "1"], title: L("Home", "Ana Sayfa")),
                 Item(keys: ["⌘", "2"], title: L("Download", "İndir")),
                 Item(keys: ["⌘", "3"], title: L("Library", "Kitaplık")),
-                Item(keys: ["⌘", "4"], title: L("Shelf", "Raf"))
+                Item(keys: ["⌘", "4"], title: L("Shelf", "Raf")),
+                Item(keys: ["⌘", "9"], title: L("Text (OCR)", "Metin (OCR)"))
             ] + MediaKind.toolKinds.enumerated().map { index, kind in
                 Item(keys: ["⌘", "\(index + 5)"], title: kind.title)
             }),

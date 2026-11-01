@@ -17,7 +17,7 @@ public enum MediaKind: String, Codable, Sendable, CaseIterable, Identifiable {
 
 public enum ConvertTarget: String, Codable, Sendable, CaseIterable, Identifiable {
     case jpeg, png, heic, webp, avif, tiff, bmp, gif
-    case pdf, txt, docx, rtf, html, odt
+    case pdf, txt, md, docx, rtf, html, odt
     case mp4, mov, m4v
     case m4a, wav, aiff
 
@@ -60,12 +60,11 @@ public enum ImageCapabilities {
 
 public enum ToolID: String, Codable, Sendable, CaseIterable, Identifiable {
     case adjustImage, cropImage, compressImage, annotateImage, redactImage, addBackground
-    case removeBackground, resizeImage, rotateImage, collage, imagesToPDF
+    case removeBackground, resizeImage, rotateImage, collage, imagesToPDF, recognizeText
     case mergePDF, splitPDF, organizePDF, compressPDF
     case trimVideo, cropVideo, compressVideo, videoSpeed, muteVideo, videoFrames, splitVideo, redactVideo, joinVideos
     case trimAudio, normalizeAudio, audioChannels, bleepAudio, audioToVideo
     case metadata, readQR, unzip
-
     public var id: String { rawValue }
 
     public var kinds: Set<MediaKind> {
@@ -73,6 +72,8 @@ public enum ToolID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .adjustImage, .cropImage, .compressImage, .annotateImage, .redactImage, .addBackground,
              .removeBackground, .resizeImage, .rotateImage, .collage, .imagesToPDF:
             [.image]
+        case .recognizeText:
+            [.image, .pdf]
         case .mergePDF, .splitPDF, .organizePDF, .compressPDF:
             [.pdf]
         case .trimVideo, .cropVideo, .compressVideo, .videoSpeed, .muteVideo, .videoFrames,
@@ -98,7 +99,7 @@ public enum ToolID: String, Codable, Sendable, CaseIterable, Identifiable {
 
     public var acceptsMany: Bool {
         switch self {
-        case .compressImage, .removeBackground, .readQR, .compressPDF, .muteVideo, .compressVideo,
+        case .compressImage, .removeBackground, .readQR, .recognizeText, .compressPDF, .muteVideo, .compressVideo,
              .normalizeAudio, .imagesToPDF, .collage, .mergePDF, .joinVideos, .unzip:
             true
         default:
@@ -109,6 +110,7 @@ public enum ToolID: String, Codable, Sendable, CaseIterable, Identifiable {
     public var primaryKind: MediaKind {
         switch self {
         case .metadata, .readQR: .image
+        case .recognizeText: .image
         default: kinds.first ?? .other
         }
     }
@@ -158,7 +160,7 @@ public enum Catalog {
         case .audio:
             list = [.m4a, .wav, .aiff]
         case .pdf:
-            list = [.png, .jpeg, .webp, .txt, .docx, .rtf]
+            list = [.png, .jpeg, .webp, .txt, .md, .docx, .rtf]
         case .document:
             list = [.pdf, .docx, .rtf, .html, .odt, .txt]
         case .archive, .other:
@@ -181,14 +183,14 @@ public enum Catalog {
         switch kind {
         case .image:
             [.adjustImage, .cropImage, .compressImage, .annotateImage, .redactImage, .addBackground,
-             .removeBackground, .metadata, .resizeImage, .rotateImage, .readQR, .collage, .imagesToPDF]
+             .removeBackground, .metadata, .resizeImage, .rotateImage, .readQR, .recognizeText, .collage, .imagesToPDF]
         case .video:
             [.trimVideo, .cropVideo, .compressVideo, .videoSpeed, .muteVideo, .videoFrames,
              .splitVideo, .redactVideo, .metadata, .joinVideos]
         case .audio:
             [.trimAudio, .normalizeAudio, .audioChannels, .bleepAudio, .audioToVideo, .metadata]
         case .pdf:
-            [.mergePDF, .splitPDF, .organizePDF, .compressPDF, .readQR, .metadata]
+            [.mergePDF, .splitPDF, .organizePDF, .compressPDF, .recognizeText, .readQR, .metadata]
         case .archive:
             [.unzip]
         case .document, .other:

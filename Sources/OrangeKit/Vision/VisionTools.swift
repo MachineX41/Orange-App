@@ -2,18 +2,6 @@ import CoreImage
 import Foundation
 import Vision
 
-public enum TextRecognizer {
-    public static func text(in image: CGImage) throws -> String {
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.automaticallyDetectsLanguage = true
-        try VNImageRequestHandler(cgImage: image).perform([request])
-        let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
-        return lines.joined(separator: "\n")
-    }
-}
-
 public struct BarcodeHit: Identifiable, Hashable, Sendable {
     public var id = UUID()
     public var source: String

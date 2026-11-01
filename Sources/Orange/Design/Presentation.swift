@@ -60,6 +60,7 @@ extension ConvertTarget {
         case .gif: "photo.stack"
         case .pdf: "doc.richtext"
         case .txt: "text.alignleft"
+        case .md: "text.badge.checkmark"
         case .docx, .odt: "doc.text"
         case .rtf: "doc.plaintext"
         case .html: "chevron.left.forwardslash.chevron.right"
@@ -103,6 +104,7 @@ extension ToolID {
         case .audioToVideo: L("To Video", "Videoya")
         case .metadata: L("Metadata", "Meta Veri")
         case .readQR: L("Read QR", "QR Oku")
+        case .recognizeText: L("Recognize Text", "Metni Tanı")
         case .unzip: L("Extract", "Aç")
         }
     }
@@ -141,7 +143,7 @@ extension ToolID {
         case .audioToVideo: L("Audio to Video", "Sesten Videoya")
         case .metadata: L("Metadata", "Meta Veri")
         case .readQR: L("Read QR & Barcodes", "QR ve Barkod Oku")
-        default: title
+        case .recognizeText: L("Recognize Text (OCR)", "Metni Tanı (OCR)")
         }
     }
 
@@ -178,6 +180,7 @@ extension ToolID {
         case .audioToVideo: L("Animated visualizer", "Animasyonlu görselleştirici")
         case .metadata: L("Inspect and remove", "İncele ve temizle")
         case .readQR: L("QR and barcodes", "QR ve barkodlar")
+        case .recognizeText: L("Apple or local models", "Apple veya yerel modeller")
         case .unzip: L("Unpack safely", "Güvenle aç")
         }
     }
@@ -211,6 +214,7 @@ extension ToolID {
         case .audioToVideo: "music.note.tv"
         case .metadata: "info.circle"
         case .readQR: "qrcode.viewfinder"
+        case .recognizeText: "text.viewfinder"
         case .unzip: "archivebox"
         }
     }

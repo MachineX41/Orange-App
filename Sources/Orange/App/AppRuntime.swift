@@ -37,8 +37,15 @@ final class AppRuntime {
     var soundOnDone: Bool { didSet { save() } }
     var hapticOnWheel: Bool { didSet { save() } }
     var wheelEnabled: Bool { didSet { save() } }
-    var showInMenuBar: Bool { didSet { save() } }
+    var showInMenuBar: Bool { didSet { save(); AppActivation.sync(menuBarVisible: showInMenuBar) } }
     var imageQuality: Double { didSet { save() } }
+    var ocrDefaultModelID: String { didSet { save() } }
+    var ocrComputePreference: String { didSet { save() } }
+    var ocrQuality: String { didSet { save() } }
+    var ocrLanguageIdentifiers: [String] { didSet { save() } }
+    var ocrMode: String { didSet { save() } }
+    var settingsTab: SettingsTab = .general
+    let ocrWorkspace = OCRWorkspaceModel()
     var showShortcuts = false
     var showOnboarding = !(UserDefaults.standard.bool(forKey: "onboardingDone") && Consent.accepted)
     var customOutputPath: String? {
@@ -77,6 +84,11 @@ final class AppRuntime {
         wheelEnabled = defaults.object(forKey: "wheelEnabled") as? Bool ?? true
         showInMenuBar = defaults.object(forKey: "showInMenuBar") as? Bool ?? true
         imageQuality = defaults.object(forKey: "imageQuality") as? Double ?? 0.88
+        ocrDefaultModelID = defaults.string(forKey: "ocrDefaultModelID") ?? OCRModelID.appleVision.rawValue
+        ocrComputePreference = defaults.string(forKey: "ocrComputePreference") ?? OCRComputePreference.automatic.rawValue
+        ocrQuality = defaults.string(forKey: "ocrQuality") ?? OCRQuality.balanced.rawValue
+        ocrLanguageIdentifiers = defaults.stringArray(forKey: "ocrLanguageIdentifiers") ?? []
+        ocrMode = defaults.string(forKey: "ocrMode") ?? OCRMode.text.rawValue
         customOutputPath = defaults.string(forKey: "customOutputPath")
         OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
 
@@ -91,16 +103,19 @@ final class AppRuntime {
         shelf = snapshot.shelf.compactMap { FileRef.load(URL(fileURLWithPath: $0)) }
         loading = false
     }
-
     private func save() {
         guard !loading else { return }
-        defaults.set(appearance.rawValue, forKey: "appearance")
         defaults.set(revealWhenDone, forKey: "revealWhenDone")
         defaults.set(soundOnDone, forKey: "soundOnDone")
         defaults.set(hapticOnWheel, forKey: "hapticOnWheel")
         defaults.set(wheelEnabled, forKey: "wheelEnabled")
         defaults.set(showInMenuBar, forKey: "showInMenuBar")
         defaults.set(imageQuality, forKey: "imageQuality")
+        defaults.set(ocrDefaultModelID, forKey: "ocrDefaultModelID")
+        defaults.set(ocrComputePreference, forKey: "ocrComputePreference")
+        defaults.set(ocrQuality, forKey: "ocrQuality")
+        defaults.set(ocrLanguageIdentifiers, forKey: "ocrLanguageIdentifiers")
+        defaults.set(ocrMode, forKey: "ocrMode")
         defaults.set(customOutputPath, forKey: "customOutputPath")
     }
 
@@ -111,6 +126,15 @@ final class AppRuntime {
     // MARK: Selection
 
     func importURLs(_ urls: [URL]) {
+        if section == .ocr {
+            let supported = urls.filter { [.image, .pdf].contains(Catalog.kind(for: $0)) }
+            guard !supported.isEmpty else {
+                toast(L("Text (OCR)", "Metin (OCR)"), L("Only images and PDFs can be used here.", "Burada yalnızca görsel ve PDF kullanılabilir."), symbol: "text.viewfinder", style: .info)
+                return
+            }
+            ocrWorkspace.add(urls: supported)
+            return
+        }
         let files = urls.compactMap(FileRef.load)
         guard !files.isEmpty else { return }
         var merged = selection
@@ -180,6 +204,7 @@ final class AppRuntime {
     }
 
     func showMainWindow() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
             window.makeKeyAndOrderFront(nil)
@@ -260,6 +285,11 @@ final class AppRuntime {
         }
         let urls = usable.map(\.url)
         switch tool {
+        case .recognizeText:
+            ocrWorkspace.add(urls: urls)
+            section = .ocr
+            showMainWindow()
+            return
         case .removeBackground:
             runEach(urls, title: tool.title, symbol: tool.symbol) { url, _ in
                 let cutout = try BackgroundRemover.cutout(ImageEngine.load(url))
@@ -394,11 +424,22 @@ final class AppRuntime {
 
     // MARK: Jobs
 
+    /// Handles for cancellable work only; plain media jobs stay fire-and-forget.
+    @ObservationIgnored private var cancellables: [UUID: Task<[URL], Never>] = [:]
+
+    func canCancel(_ id: UUID) -> Bool { cancellables[id] != nil }
+
+    func cancelJob(_ id: UUID) {
+        cancellables[id]?.cancel()
+    }
+
     @discardableResult
     func run(
         _ title: String,
         symbol: String,
         detail: String = "",
+        successMessage: String? = nil,
+        cancellable: Bool = false,
         work: @escaping @Sendable (@escaping ProgressHandler) async throws -> [URL]
     ) -> Task<[URL], Never> {
         let id = UUID()
@@ -409,6 +450,7 @@ final class AppRuntime {
             let clamped = min(max(value, 0), 1)
             Task { @MainActor in
                 let runtime = AppRuntime.shared
+                guard runtime.jobs.contains(where: { $0.id == id && $0.state == .running }) else { return }
                 guard let current = runtime.progress[id] else { return }
                 let delta = abs(clamped - current)
                 // The first bytes, every noticeable step, a new file starting over, and completion.
@@ -416,16 +458,32 @@ final class AppRuntime {
                 runtime.progress[id] = clamped
             }
         }
-        return Task {
+        let worker: Task<[URL], any Error> = Task.detached(priority: .userInitiated) {
+            try await work(report)
+        }
+        let outer: Task<[URL], Never> = Task { @MainActor in
             do {
-                let outputs = try await Task.detached(priority: .userInitiated) { try await work(report) }.value
-                finish(id, outputs: outputs, title: title, symbol: symbol)
+                let outputs = try await withTaskCancellationHandler {
+                    try await worker.value
+                } onCancel: {
+                    worker.cancel()
+                }
+                try Task.checkCancellation()
+                if cancellable { self.cancellables[id] = nil }
+                self.finish(id, outputs: outputs, title: title, symbol: symbol, successMessage: successMessage)
                 return outputs
             } catch {
-                fail(id, error: error, title: title)
+                if cancellable { self.cancellables[id] = nil }
+                if error is CancellationError || (error as? OrangeError) == .cancelled {
+                    self.cancelFinish(id, title: title)
+                } else {
+                    self.fail(id, error: error, title: title)
+                }
                 return []
             }
         }
+        if cancellable { self.cancellables[id] = outer }
+        return outer
     }
 
     func runEach(
@@ -446,6 +504,7 @@ final class AppRuntime {
                 do {
                     outputs += try await work(url) { value in progress((Double(index) + value) / Double(urls.count)) }
                 } catch {
+                    if error is CancellationError || (error as? OrangeError) == .cancelled { throw error }
                     firstError = firstError ?? error
                 }
                 progress(Double(index + 1) / Double(urls.count))
@@ -455,17 +514,34 @@ final class AppRuntime {
         }
     }
 
-    private func finish(_ id: UUID, outputs: [URL], title: String, symbol: String) {
+    private func finish(_ id: UUID, outputs: [URL], title: String, symbol: String, successMessage: String? = nil) {
         progress[id] = nil
+        let detail: String
+        if outputs.count == 1 { detail = outputs[0].lastPathComponent }
+        else if !outputs.isEmpty { detail = L("\(outputs.count) files", "\(outputs.count) dosya") }
+        else { detail = successMessage ?? L("Done", "Tamamlandı") }
         if let index = jobs.firstIndex(where: { $0.id == id }) {
             jobs[index].state = .success
             jobs[index].outputPaths = outputs.map(\.path)
-            jobs[index].detail = outputs.count == 1 ? outputs[0].lastPathComponent : L("\(outputs.count) files", "\(outputs.count) dosya")
+            jobs[index].detail = detail
         }
         persist()
         if soundOnDone { NSSound(named: "Glass")?.play() }
         if revealWhenDone, !outputs.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(outputs) }
-        toast(title, outputs.count == 1 ? outputs[0].lastPathComponent : L("\(outputs.count) files ready", "\(outputs.count) dosya hazır"), symbol: "checkmark.circle.fill", style: .success, outputs: outputs)
+        if !outputs.isEmpty || successMessage != nil {
+            toast(title, detail, symbol: "checkmark.circle.fill", style: .success, outputs: outputs)
+        }
+        ActivityHUD.shared.refresh()
+    }
+
+    private func cancelFinish(_ id: UUID, title: String) {
+        progress[id] = nil
+        if let index = jobs.firstIndex(where: { $0.id == id }) {
+            jobs[index].state = .cancelled
+            jobs[index].detail = L("Cancelled", "İptal edildi")
+        }
+        persist()
+        ActivityHUD.shared.refresh()
     }
 
     private func fail(_ id: UUID, error: Error, title: String) {

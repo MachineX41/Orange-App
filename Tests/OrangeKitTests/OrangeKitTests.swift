@@ -161,14 +161,16 @@ final class ImageEngineTests: XCTestCase {
 }
 
 final class DocumentAndPDFTests: XCTestCase {
-    func testDocumentRoundTrip() throws {
+    func testDocumentRoundTrip() async throws {
         let directory = try makeTempDirectory()
         let note = directory.appendingPathComponent("note.txt")
         try "Orange document\nSecond line".write(to: note, atomically: true, encoding: .utf8)
-        let docx = try DocumentConverter.convert(note, to: .docx)
-        XCTAssertTrue(try DocumentConverter.load(docx).string.contains("Orange document"))
-        let pdf = try DocumentConverter.convert(note, to: .pdf)
-        XCTAssertTrue(try PDFToolkit.text(of: pdf).contains("Second line"))
+        let docx = try await DocumentConverter.convert(note, to: .docx)
+        let docxText = try await DocumentConverter.load(docx).string
+        XCTAssertTrue(docxText.contains("Orange document"))
+        let pdf = try await DocumentConverter.convert(note, to: .pdf)
+        let pdfText = try await PDFToolkit.text(of: pdf)
+        XCTAssertTrue(pdfText.contains("Second line"))
 
         let merged = try PDFToolkit.merge(urls: [pdf, pdf], into: directory)
         XCTAssertEqual(try PDFToolkit.pageCount(of: merged), 2)

@@ -14,7 +14,14 @@ bin="$(swift build -c "$config" --show-bin-path)"
 
 app="$root/build/Orange.app"
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$root/build/AppIcon.iconset"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Helpers" "$root/build/AppIcon.iconset"
+
+helper="$root/build/ocr-runtime/OrangeOCRHelper"
+if [[ -x "$helper" ]]; then
+  cp "$helper" "$app/Contents/Helpers/OrangeOCRHelper"
+  # Sign the helper before the enclosing app so nested code is sealed first.
+  codesign --force --sign - --identifier app.orange.studio.helper "$app/Contents/Helpers/OrangeOCRHelper" >/dev/null
+fi
 
 cp "$bin/Orange" "$app/Contents/MacOS/Orange"
 cp "$root/Configuration/Info.plist" "$app/Contents/Info.plist"

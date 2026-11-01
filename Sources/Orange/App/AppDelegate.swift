@@ -3,13 +3,81 @@ import OrangeKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var hidesLaunchWindow = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        let runtime = AppRuntime.shared
+        hidesLaunchWindow = runtime.showInMenuBar && !runtime.showOnboarding
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didChangeOcclusionStateNotification,
+                     NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
+                     NSWindow.willCloseNotification] {
+            center.addObserver(self, selector: #selector(windowVisibilityChanged), name: name, object: nil)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Consent.accepted { DragWatcher.shared.start() }
-        NSApp.activate()
+        configureNativeOCR()
+
+        if hidesLaunchWindow {
+            // Pencere bu anda görünürse hemen gizle; değilse didBecomeKey yakalayacak.
+            hidesLaunchWindow = !hideVisibleMainWindows()
+            AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar)
+        } else {
+            NSApp.activate()
+            DispatchQueue.main.async { AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar) }
+        }
+
         DispatchQueue.main.async { AppMover.offerIfNeeded() }
         #if DEBUG
         runDemoIfRequested()
         #endif
+    }
+
+    @discardableResult
+    private func hideVisibleMainWindows() -> Bool {
+        var hid = false
+        for window in NSApp.windows where window.isVisible && window.identifier?.rawValue.hasPrefix("main") == true {
+            window.orderOut(nil)
+            hid = true
+        }
+        return hid
+    }
+
+    @objc private func windowVisibilityChanged(_ notification: Notification) {
+        if hidesLaunchWindow,
+           notification.name == NSWindow.didBecomeKeyNotification,
+           let window = notification.object as? NSWindow,
+           window.identifier?.rawValue.hasPrefix("main") == true {
+            window.orderOut(nil)
+            hidesLaunchWindow = false
+        }
+        DispatchQueue.main.async {
+            AppActivation.sync(menuBarVisible: AppRuntime.shared.showInMenuBar)
+        }
+    }
+
+    /// Wires the warm native helper into OCRService once at launch.
+    /// No model loads here — first inference with a VLM triggers load.
+    private var ocrReapTimer: Timer?
+    private var memorySource: DispatchSourceMemoryPressure?
+
+    private func configureNativeOCR() {
+        let helper = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Helpers/OrangeOCRHelper")
+        guard FileManager.default.isExecutableFile(atPath: helper.path) else { return }
+        Task { await OCRService.shared.configureNative(engine: NativeOCREngine(helperURL: helper)) }
+        // 8GB Macs: release the warm helper (1.5-3GB) after 60s idle.
+        ocrReapTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { await OCRService.shared.reapNativeIfIdle(timeout: 60) }
+        }
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        source.setEventHandler {
+            Task { await OCRService.shared.handleMemoryPressure() }
+        }
+        source.activate()
+        memorySource = source
     }
 
     /// The system Settings item's key changes with the macOS language (⌘Ö in Turkish), so it is read rather than assumed.
@@ -62,5 +130,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         AppRuntime.shared.importURLs(urls)
         AppRuntime.shared.showMainWindow()
+    }
+}
+
+@MainActor
+enum AppActivation {
+    /// OrbStack gibi: gerçek bir pencere görünürken regular (Dock + uygulama menüsü), aksi halde accessory.
+    static func sync(menuBarVisible: Bool) {
+        let hasWindow = NSApp.windows.contains {
+            ($0.isVisible || $0.isMiniaturized) && $0.styleMask.contains(.titled) && !($0 is NSPanel)
+        }
+        let policy: NSApplication.ActivationPolicy = (hasWindow || !menuBarVisible) ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
     }
 }
