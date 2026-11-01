@@ -300,6 +300,63 @@ extension WheelMode {
     }
 }
 
+struct WheelSliceOption: Identifiable, Hashable {
+    var id: String
+    var title: String
+    var symbol: String
+    var group: String
+}
+
+enum WheelSliceCatalog {
+    static func options(_ mode: WheelMode) -> [WheelSliceOption] {
+        switch mode {
+        case .actions:
+            return ActionID.allCases.map {
+                WheelSliceOption(id: "a-\($0.rawValue)", title: $0.title, symbol: $0.symbol, group: "")
+            }
+        case .tools:
+            return ToolID.allCases.map { tool in
+                let group = tool.kinds.count > 1 ? L("Several", "Birden fazla") : tool.primaryKind.title
+                return WheelSliceOption(id: "t-\(tool.rawValue)", title: tool.windowTitle, symbol: tool.symbol, group: group)
+            }
+        case .convert:
+            return ConvertTarget.allCases.map { target in
+                WheelSliceOption(id: "c-\(target.rawValue)", title: target.title, symbol: target.symbol, group: convertGroup(target))
+            }
+        }
+    }
+
+    private static func convertGroup(_ target: ConvertTarget) -> String {
+        switch target {
+        case .jpeg, .png, .heic, .webp, .avif, .tiff, .bmp, .gif:
+            MediaKind.image.title
+        case .pdf, .txt, .docx, .rtf, .html, .odt:
+            MediaKind.document.title
+        case .mp4, .mov, .m4v:
+            MediaKind.video.title
+        case .m4a, .wav, .aiff:
+            MediaKind.audio.title
+        }
+    }
+
+    /// Slices the wheel showed before customization: every action and format, and the first tools on each kind.
+    static func isDefault(_ id: String) -> Bool {
+        if id.hasPrefix("a-") { return ActionID(rawValue: String(id.dropFirst(2))) != nil }
+        if id.hasPrefix("c-") { return ConvertTarget(rawValue: String(id.dropFirst(2))) != nil }
+        return defaultToolIDs.contains(id)
+    }
+
+    private static let defaultToolIDs: Set<String> = {
+        var ids = Set<String>()
+        for kind in MediaKind.allCases {
+            let tools = Catalog.tools(for: kind)
+            let shown = tools.count > 8 ? Array(tools.prefix(7)) : tools
+            for tool in shown { ids.insert("t-\(tool.rawValue)") }
+        }
+        return ids
+    }()
+}
+
 extension Error {
     var orangeMessage: String {
         (self as? OrangeError)?.message ?? localizedDescription

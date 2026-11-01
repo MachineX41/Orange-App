@@ -69,6 +69,7 @@ struct SettingsView: View {
                     SettingsToggle(title: L("Show the wheel while dragging files", "Dosya sürüklerken çarkı göster"), isOn: $runtime.wheelEnabled)
                     SettingsToggle(title: L("Haptic feedback on slices", "Dilimlerde dokunsal geri bildirim"), isOn: $runtime.hapticOnWheel)
                 }
+                WheelSliceEditor()
                 SettingsGroup(title: L("How it works", "Nasıl çalışır"), symbol: "hand.draw") {
                     ForEach(WheelMode.allCases, id: \.self) { mode in
                         HStack(spacing: 10) {
@@ -90,7 +91,7 @@ struct SettingsView: View {
                 .tabItem { Label(L("Privacy", "Gizlilik"), systemImage: "hand.raised") }
         }
         .tint(OrangeTheme.accent)
-        .frame(width: 640, height: 560)
+        .frame(width: 640, height: 680)
         .background(OrangeBackdrop())
         .background(SettingsChrome())
     }
@@ -172,6 +173,98 @@ struct PrivacySettings: View {
         } message: {
             Text(L("Your files stay where they are. Only Orange’s list of them is removed.", "Dosyalarınız yerinde kalır. Yalnızca Orange’ın onlara ait listesi silinir."))
         }
+    }
+}
+
+/// Add and remove the slices that appear on each wheel.
+private struct WheelSliceEditor: View {
+    @Environment(AppRuntime.self) private var runtime
+
+    var body: some View {
+        ForEach(WheelMode.allCases, id: \.self) { mode in
+            SettingsGroup(title: mode.title, symbol: mode.symbol) {
+                Text(L("A slice shows up when it fits the files you are holding.", "Bir dilim, tuttuğun dosyaya uygunsa çarkta belirir."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                sliceLists(mode)
+            }
+        }
+        Button(L("Restore all slices", "Tüm dilimleri geri getir")) { runtime.resetWheelSlices() }
+            .buttonStyle(.glass)
+            .tint(nil)
+            .disabled(runtime.hiddenWheelSlices.isEmpty && runtime.addedWheelSlices.isEmpty)
+    }
+
+    private func sliceLists(_ mode: WheelMode) -> some View {
+        let options = WheelSliceCatalog.options(mode)
+        let onWheel = options.filter { runtime.wheelSliceIncluded($0.id) }
+        let offWheel = options.filter { !runtime.wheelSliceIncluded($0.id) }
+        return VStack(alignment: .leading, spacing: 10) {
+            section(L("On the wheel", "Çarkta"), options: onWheel, included: true)
+            if !offWheel.isEmpty {
+                section(L("Add", "Ekle"), options: offWheel, included: false)
+            }
+        }
+    }
+
+    private func section(_ title: String, options: [WheelSliceOption], included: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            if options.isEmpty {
+                Text(L("Nothing here.", "Burada bir şey yok."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+            } else {
+                rows(options, included: included)
+            }
+        }
+    }
+
+    private func rows(_ options: [WheelSliceOption], included: Bool) -> some View {
+        let groups = grouped(options)
+        return VStack(alignment: .leading, spacing: 8) {
+            ForEach(groups, id: \.name) { group in
+                if !group.name.isEmpty {
+                    Text(group.name)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
+                ForEach(group.items) { option in
+                    HStack(spacing: 10) {
+                        Image(systemName: option.symbol)
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(width: 18)
+                            .foregroundStyle(.secondary)
+                        Text(option.title)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Button {
+                            runtime.setWheelSlice(option.id, included: !included)
+                        } label: {
+                            Image(systemName: included ? "minus.circle" : "plus.circle")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help(included ? L("Remove", "Çıkar") : L("Add", "Ekle"))
+                    }
+                }
+            }
+        }
+    }
+
+    private func grouped(_ options: [WheelSliceOption]) -> [(name: String, items: [WheelSliceOption])] {
+        var ordered: [String] = []
+        var buckets: [String: [WheelSliceOption]] = [:]
+        for option in options {
+            if buckets[option.group] == nil { ordered.append(option.group) }
+            buckets[option.group, default: []].append(option)
+        }
+        return ordered.map { ($0, buckets[$0] ?? []) }
     }
 }
 

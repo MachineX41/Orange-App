@@ -35,7 +35,7 @@ final class AppRuntime {
     var appearance: AppearanceChoice {
         didSet {
             save()
-            FloatShelf.shared.applyAppearance()
+            applyInterfaceAppearance()
         }
     }
     var language: LanguageChoice {
@@ -58,6 +58,14 @@ final class AppRuntime {
             OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
             save()
         }
+    }
+    /// Slice ids removed from the original wheel.
+    var hiddenWheelSlices: Set<String> {
+        didSet { save() }
+    }
+    /// Slice ids added on top of the original wheel.
+    var addedWheelSlices: Set<String> {
+        didSet { save() }
     }
 
     var running: [JobRecord] { jobs.filter { $0.state == .running } }
@@ -93,6 +101,8 @@ final class AppRuntime {
         showInMenuBar = defaults.object(forKey: "showInMenuBar") as? Bool ?? true
         imageQuality = defaults.object(forKey: "imageQuality") as? Double ?? 0.88
         customOutputPath = defaults.string(forKey: "customOutputPath")
+        hiddenWheelSlices = Set(defaults.stringArray(forKey: "hiddenWheelSlices") ?? [])
+        addedWheelSlices = Set(defaults.stringArray(forKey: "addedWheelSlices") ?? [])
         OutputLocation.customDirectory = customOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
 
         let snapshot = store.load()
@@ -118,6 +128,8 @@ final class AppRuntime {
         defaults.set(showInMenuBar, forKey: "showInMenuBar")
         defaults.set(imageQuality, forKey: "imageQuality")
         defaults.set(customOutputPath, forKey: "customOutputPath")
+        defaults.set(hiddenWheelSlices.sorted(), forKey: "hiddenWheelSlices")
+        defaults.set(addedWheelSlices.sorted(), forKey: "addedWheelSlices")
     }
 
     private func persist() {
@@ -195,8 +207,25 @@ final class AppRuntime {
         showOnboarding = true
     }
 
+    /// SwiftUI color scheme and AppKit glass both follow the chosen theme.
+    func applyInterfaceAppearance() {
+        let appearance: NSAppearance? = switch appearance {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+        NSApp.appearance = appearance
+        for window in NSApp.windows {
+            window.appearance = appearance
+            window.contentView?.appearance = appearance
+        }
+        FloatShelf.shared.applyAppearance()
+        GlobalWheel.shared.applyAppearance()
+    }
+
     func showMainWindow() {
         NSApp.activate()
+        applyInterfaceAppearance()
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
@@ -208,27 +237,83 @@ final class AppRuntime {
     // MARK: Wheel
 
     func choices(_ mode: WheelMode, files: [FileRef]) -> [WheelChoice] {
+        var list = classicChoices(mode, files: files).filter { !hiddenWheelSlices.contains($0.id) }
+        let present = Set(list.map(\.id))
+        let extras = compatibleChoices(mode, files: files).filter {
+            addedWheelSlices.contains($0.id) && !present.contains($0.id)
+        }
+        if let more = list.firstIndex(where: { if case .more = $0.payload { true } else { false } }) {
+            list.insert(contentsOf: extras, at: more)
+        } else {
+            list.append(contentsOf: extras)
+        }
+        if list.allSatisfy({ if case .more = $0.payload { true } else { false } }) {
+            list.removeAll()
+        }
+        return list
+    }
+
+    func wheelSliceIncluded(_ id: String) -> Bool {
+        if addedWheelSlices.contains(id) { return true }
+        if hiddenWheelSlices.contains(id) { return false }
+        return WheelSliceCatalog.isDefault(id)
+    }
+
+    func setWheelSlice(_ id: String, included: Bool) {
+        if included {
+            hiddenWheelSlices.remove(id)
+            if !WheelSliceCatalog.isDefault(id) { addedWheelSlices.insert(id) }
+        } else {
+            addedWheelSlices.remove(id)
+            if WheelSliceCatalog.isDefault(id) { hiddenWheelSlices.insert(id) }
+        }
+    }
+
+    func resetWheelSlices() {
+        hiddenWheelSlices.removeAll()
+        addedWheelSlices.removeAll()
+    }
+
+    /// The wheel as it shipped: a short set of slices, with More when a tool list is long.
+    private func classicChoices(_ mode: WheelMode, files: [FileRef]) -> [WheelChoice] {
         let urls = files.map(\.url)
         switch mode {
         case .convert:
-            let targets = Catalog.commonConvertTargets(for: urls)
-            return targets.prefix(10).map {
-                WheelChoice(id: "c-\($0.rawValue)", title: $0.title, symbol: $0.symbol, payload: .convert($0))
-            }
+            return Catalog.commonConvertTargets(for: urls).prefix(10).map(convertChoice)
         case .tools:
             let tools = Catalog.commonTools(for: urls)
-            var list = tools.prefix(tools.count > 8 ? 7 : 8).map {
-                WheelChoice(id: "t-\($0.rawValue)", title: $0.title, symbol: $0.symbol, payload: .tool($0))
-            }
+            var list = tools.prefix(tools.count > 8 ? 7 : 8).map(toolChoice)
             if tools.count > 8 {
                 list.append(WheelChoice(id: "more", title: L("More", "Diğer"), symbol: "ellipsis", payload: .more))
             }
             return list
         case .actions:
-            return ActionID.allCases.map {
-                WheelChoice(id: "a-\($0.rawValue)", title: $0.title, symbol: $0.symbol, payload: .action($0))
-            }
+            return ActionID.allCases.map(actionChoice)
         }
+    }
+
+    private func compatibleChoices(_ mode: WheelMode, files: [FileRef]) -> [WheelChoice] {
+        let urls = files.map(\.url)
+        switch mode {
+        case .convert:
+            return Catalog.commonConvertTargets(for: urls).map(convertChoice)
+        case .tools:
+            return Catalog.commonTools(for: urls).map(toolChoice)
+        case .actions:
+            return ActionID.allCases.map(actionChoice)
+        }
+    }
+
+    private func convertChoice(_ target: ConvertTarget) -> WheelChoice {
+        WheelChoice(id: "c-\(target.rawValue)", title: target.title, symbol: target.symbol, payload: .convert(target))
+    }
+
+    private func toolChoice(_ tool: ToolID) -> WheelChoice {
+        WheelChoice(id: "t-\(tool.rawValue)", title: tool.title, symbol: tool.symbol, payload: .tool(tool))
+    }
+
+    private func actionChoice(_ action: ActionID) -> WheelChoice {
+        WheelChoice(id: "a-\(action.rawValue)", title: action.title, symbol: action.symbol, payload: .action(action))
     }
 
     func session(_ mode: WheelMode, files: [FileRef]) -> WheelSession? {

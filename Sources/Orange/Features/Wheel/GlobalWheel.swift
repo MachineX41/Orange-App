@@ -48,7 +48,11 @@ final class GlobalWheel {
         container.addSubview(host)
         container.addSubview(drop)
         panel.contentView = container
+        self.host = host
+        applyAppearance()
     }
+
+    private let host: NSView
 
     func show(at screenPoint: NSPoint) {
         hideTask?.cancel()
@@ -61,7 +65,23 @@ final class GlobalWheel {
         }
         panel.setFrameOrigin(origin)
         panel.alphaValue = 1
+        applyAppearance()
         panel.orderFrontRegardless()
+    }
+
+    /// Glass follows the app theme, including System when the Mac switches on its own.
+    func applyAppearance() {
+        let appearance: NSAppearance? = switch AppRuntime.shared.appearance {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+        panel.appearance = appearance
+        panel.contentView?.appearance = appearance
+        host.appearance = appearance
+        for view in panel.contentView?.subviews ?? [] {
+            view.appearance = appearance
+        }
     }
 
     func hide(after delay: Double = 0) {
@@ -94,6 +114,7 @@ struct GlobalWheelView: View {
             }
         }
         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
+        .preferredColorScheme(runtime.appearance.colorScheme)
     }
 }
 

@@ -137,14 +137,15 @@ struct WheelDemo: View {
             ZStack {
                 ZStack {
                     ForEach(0..<count, id: \.self) { index in
-                        WheelSegment(index: index, count: count, inner: inner, outer: outer, gap: 3, corner: 6)
-                            .fill(index == target && highlighted ? OrangeTheme.accent : Color(white: 0.36).opacity(0.92))
+                        let shape = WheelSegment(index: index, count: count, inner: inner, outer: outer, gap: 3, corner: 6)
+                        let highlightedSlice = index == target && highlighted
+                        WheelSlicePlate(shape: shape, selected: highlightedSlice)
                             .frame(width: outer * 2, height: outer * 2)
                             .position(center)
                         let angle = -CGFloat.pi / 2 + CGFloat(index) * slice
                         Image(systemName: mode.sampleSymbols[index])
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(highlightedSlice ? Color.white : Color.primary)
                             .position(
                                 x: center.x + cos(angle) * (outer + inner) / 2,
                                 y: center.y + sin(angle) * (outer + inner) / 2

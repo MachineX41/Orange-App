@@ -89,17 +89,11 @@ struct WheelFace: View {
         ZStack {
             ZStack {
                 ForEach(Array(session.choices.enumerated()), id: \.element.id) { index, _ in
-                    let shape = WheelSegment(index: index, count: session.choices.count)
-                    shape
-                        .fill(Color.primary.opacity(0.06))
-                        .frame(width: WheelMetrics.size, height: WheelMetrics.size)
-                        .glassEffect(.regular, in: shape)
-                        .overlay {
-                            shape
-                                .fill(OrangeTheme.accent)
-                                .opacity(index == highlight ? 1 : 0)
-                                .allowsHitTesting(false)
-                        }
+                    WheelSlicePlate(
+                        shape: WheelSegment(index: index, count: session.choices.count),
+                        selected: index == highlight
+                    )
+                    .frame(width: WheelMetrics.size, height: WheelMetrics.size)
                 }
             }
 
@@ -116,6 +110,7 @@ struct WheelFace: View {
                         .minimumScaleFactor(0.6)
                 }
                 .foregroundStyle(selected ? Color.white : Color.primary)
+                .fontWeight(selected ? .semibold : .regular)
                 .frame(width: 64)
                 .scaleEffect(selected ? 1.04 : 1)
                 .position(layout.point(for: index))
@@ -125,6 +120,23 @@ struct WheelFace: View {
         }
         .frame(width: WheelMetrics.size, height: WheelMetrics.size)
         .animation(.spring(response: 0.26, dampingFraction: 0.72), value: highlight)
+    }
+}
+
+/// Idle slices stay clear glass. The hovered slice is the same orange as the panel buttons.
+struct WheelSlicePlate: View {
+    var shape: WheelSegment
+    var selected: Bool
+
+    var body: some View {
+        shape
+            .fill(Color.clear)
+            .glassEffect(selected ? .regular.tint(OrangeTheme.accent).interactive() : .clear, in: shape)
+            .overlay {
+                shape
+                    .fill(OrangeTheme.accent)
+                    .opacity(selected ? 1 : 0)
+            }
     }
 }
 
@@ -145,13 +157,14 @@ struct WheelCenter: View {
             .minimumScaleFactor(0.7)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .glassEffect(.regular, in: Capsule())
+            .glassEffect(.clear, in: Capsule())
     }
 }
 
 /// Click-driven wheel shown inside the main window.
 struct LocalWheelOverlay: View {
     @Environment(AppRuntime.self) private var runtime
+    @Environment(\.colorScheme) private var colorScheme
     var session: WheelSession
     @State var highlight: Int?
     @State var appeared = false
@@ -159,7 +172,7 @@ struct LocalWheelOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.18)
+            Color.black.opacity(colorScheme == .dark ? 0.42 : 0.1)
                 .ignoresSafeArea()
                 .onTapGesture { runtime.localWheel = nil }
             WheelFace(session: session, highlight: highlight)
@@ -184,6 +197,7 @@ struct LocalWheelOverlay: View {
                 .scaleEffect(appeared ? 1 : 0.86)
                 .opacity(appeared ? 1 : 0)
         }
+        .preferredColorScheme(runtime.appearance.colorScheme)
         .focusable()
         .focusEffectDisabled()
         .focused($focused)

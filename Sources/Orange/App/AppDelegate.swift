@@ -4,9 +4,19 @@ import OrangeKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppRuntime.shared.applyInterfaceAppearance()
         if Consent.accepted { DragWatcher.shared.start() }
         NSApp.activate()
         DispatchQueue.main.async { AppMover.offerIfNeeded() }
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                AppRuntime.shared.applyInterfaceAppearance()
+            }
+        }
         #if DEBUG
         runDemoIfRequested()
         #endif
