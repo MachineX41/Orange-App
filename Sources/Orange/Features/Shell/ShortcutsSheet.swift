@@ -76,47 +76,75 @@ struct ShortcutsSheet: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Image(systemName: "keyboard")
-                    .font(.system(size: 18, weight: .light))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 1) {
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(L("Keyboard Shortcuts", "Klavye Kısayolları"))
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
                     Text(L("Everything in Orange works from the keyboard.", "Orange’daki her şey klavyeden de çalışır."))
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
-                TextField(L("Search", "Ara"), text: $query)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 180)
-            }
-            .padding(20)
-
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14, alignment: .top), GridItem(.flexible(), spacing: 14, alignment: .top)], alignment: .leading, spacing: 14) {
-                    ForEach(filtered) { group in
-                        card(group)
+                Spacer(minLength: 16)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    TextField(L("Search", "Ara"), text: $query)
+                        .textFieldStyle(.plain)
+                    if !query.isEmpty {
+                        Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-                .animation(.easeOut(duration: 0.2), value: query)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(width: 210)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 22)
+            .padding(.bottom, 16)
+
+            if filtered.isEmpty {
+                EmptyHint(
+                    symbol: "keyboard",
+                    title: L("No shortcuts", "Kısayol yok"),
+                    message: L("Nothing matches that search.", "Bu aramayla eşleşen bir kısayol yok.")
+                )
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14, alignment: .top), GridItem(.flexible(), spacing: 14, alignment: .top)], alignment: .leading, spacing: 14) {
+                        ForEach(filtered) { group in
+                            card(group)
+                        }
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 8)
+                    .animation(.easeOut(duration: 0.2), value: query)
+                }
+                .scrollContentBackground(.hidden)
             }
 
             HStack {
                 Text(L("Tip: open this list any time with ⌘/.", "İpucu: bu listeyi istediğiniz an ⌘/ ile açın."))
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Button(L("Done", "Bitti")) { dismiss() }
                     .buttonStyle(.glassProminent)
                     .tint(OrangeTheme.accent)
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 16)
         }
-        .frame(width: 720, height: 560)
+        .frame(width: 760, height: 580)
+        .background(OrangeBackdrop())
+        .presentationBackground { OrangeBackdrop() }
+        .background(ShortcutsChrome())
     }
 
     private func card(_ group: Group) -> some View {
@@ -137,5 +165,26 @@ struct ShortcutsSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(radius: 18)
         .transition(.opacity)
+    }
+}
+
+/// Drops the system sheet fill so the same warm backdrop as the main panel shows through.
+private struct ShortcutsChrome: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { Self.apply(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { Self.apply(nsView.window) }
+    }
+
+    private static func apply(_ window: NSWindow?) {
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
+        window?.titlebarAppearsTransparent = true
+        window?.titleVisibility = .hidden
+        window?.titlebarSeparatorStyle = .none
     }
 }
