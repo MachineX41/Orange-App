@@ -16,7 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unit tests (no model downloads)
-        run: swift test --xunit-output build/ocr-unit.xml
+        run: |
+          mkdir -p build
+          swift test --xunit-output build/ocr-unit.xml
       - name: Upload unit results
         if: always()
         uses: actions/upload-artifact@v4
