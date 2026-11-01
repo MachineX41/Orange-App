@@ -57,31 +57,49 @@ final class OCRRunner {
         let total = sources.reduce(0) { $0 + $1.pageCount }
         var done = 0
         await setPhase(.loadingModel, runID: runID)
+        progress(0)
         for source in sources {
             try Task.checkCancellation()
-            let baseDone = done
             let result = try await OCRService.shared.recognize(
                 url: source.url, options: options,
                 onPage: { [weak self] page in
                     guard let self else { return }
                     Task { @MainActor [weak self] in
-                        self?.applyPage(page, runID: runID)
+                        guard let self, model.runID == runID else { return }
+                        self.applyPage(page, runID: runID)
+                        // Page-granular progress: deterministic, monotonic.
+                        // In-page engine progress is ignored (VLM has none).
+                        self.pageCompleted(runID: runID, total: total, progress: progress)
                     }
                 },
-                progress: { value in
-                    let overall = total > 0 ? (Double(baseDone) + value) / Double(total) : value
-                    progress(overall)
-                }
+                progress: nil
             )
-            for page in result.pages {
+            // Pages already applied via onPage; result loop only guards missed callbacks.
+            for page in result.pages where !isApplied(page) {
                 applyPage(page, runID: runID)
-                done += 1
-                await setPhase(.recognizing(current: done, total: total), runID: runID)
+                pageCompleted(runID: runID, total: total, progress: progress)
             }
+            done = min(done + result.pages.count, total)
         }
         await MainActor.run { [weak self] in
             guard let self, model.runID == runID else { return }
             model.finishRun()
+        }
+    }
+
+    /// Called on MainActor once per completed page.
+    private func pageCompleted(runID: Int, total: Int, progress: @escaping ProgressHandler) {
+        guard model.runID == runID else { return }
+        let completed = model.pages.filter { !$0.text.isEmpty || $0.embeddedTextUsed }.count
+        model.phase = .recognizing(current: min(completed, total), total: total)
+        progress(total > 0 ? Double(min(completed, total)) / Double(total) : 1)
+    }
+
+    private func isApplied(_ page: OCRPageResult) -> Bool {
+        model.pages.contains {
+            $0.sourceURL.standardizedFileURL == page.sourceURL.standardizedFileURL
+                && $0.pageIndex == page.pageIndex
+                && (!$0.text.isEmpty || $0.embeddedTextUsed)
         }
     }
 
