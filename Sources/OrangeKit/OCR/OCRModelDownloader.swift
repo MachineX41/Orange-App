@@ -355,7 +355,7 @@ final class DownloadDelegate: NSObject, URLSessionDataDelegate, @unchecked Senda
     weak var owner: OCRModelDownloader?
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        guard let owner, let http = response as? HTTPURLResponse else {
+        guard let http = response as? HTTPURLResponse else {
             completionHandler(.cancel)
             return
         }

@@ -143,7 +143,6 @@ extension ToolID {
         case .metadata: L("Metadata", "Meta Veri")
         case .readQR: L("Read QR & Barcodes", "QR ve Barkod Oku")
         case .recognizeText: L("Recognize Text (OCR)", "Metni Tanı (OCR)")
-        default: title
         }
     }
 

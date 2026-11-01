@@ -430,7 +430,7 @@ struct OCRWorkspace: View {
 
     private func openModels() {
         runtime.settingsTab = .models
-        try? openSettings()
+        openSettings()
     }
 
     private func copy(page: OCRWorkspaceModel.PageState) {

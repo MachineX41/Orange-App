@@ -59,6 +59,7 @@ final class OCRRunner {
         await setPhase(.loadingModel, runID: runID)
         for source in sources {
             try Task.checkCancellation()
+            let baseDone = done
             let result = try await OCRService.shared.recognize(
                 url: source.url, options: options,
                 onPage: { [weak self] page in
@@ -68,12 +69,12 @@ final class OCRRunner {
                     }
                 },
                 progress: { value in
-                    let overall = total > 0 ? (Double(done) + value) / Double(total) : value
+                    let overall = total > 0 ? (Double(baseDone) + value) / Double(total) : value
                     progress(overall)
                 }
             )
             for page in result.pages {
-                await applyPage(page, runID: runID)
+                applyPage(page, runID: runID)
                 done += 1
                 await setPhase(.recognizing(current: done, total: total), runID: runID)
             }
