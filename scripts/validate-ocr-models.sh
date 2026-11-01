@@ -103,8 +103,8 @@ if skips:
     sys.exit(1)
 print("MATRIX SUCCESS: all cases passed (1 accepted CPU-unsupported skip)")
 EOF
-status=$?
-if [[ $status -ne 0 ]]; then exit $status; fi
+matrix_status=$?
+if [[ $matrix_status -ne 0 ]]; then exit $matrix_status; fi
 
 if [[ -n "$publish_pr" ]]; then
   summary="$(python3 -c "import json; r=json.load(open('$outdir/matrix.json')); print('; '.join(f\"{k}={v}\" for k,v in r['found'].items()))")"
