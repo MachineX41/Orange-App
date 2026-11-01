@@ -34,6 +34,33 @@ public enum OCRPostprocess {
             .map { $0.trimmingCharacters(in: .whitespaces) }
     }
 
+    /// Rewrites hallucinated image URLs to plain figure placeholders.
+    /// Models emit `![](https://...)`, `![](image-url)`, `![](#)` even when told
+    /// not to; the URL is always invented since the model has no file access.
+    /// `![alt](real-local-path.png)` is kept (produced by image extraction).
+    public static func sanitizeFigureURLs(_ text: String) -> String {
+        var result = text
+        // ![](http...) or ![](https...) with empty/short alt -> figure placeholder
+        result = result.replacingOccurrences(
+            of: #"!\[([^\]]{0,80})\]\(https?://[^)]*\)"#,
+            with: "![Figure: $1]",
+            options: .regularExpression
+        )
+        // ![](image-url), ![](#), ![](image.png) generics -> placeholder
+        result = result.replacingOccurrences(
+            of: #"!\[([^\]]{0,80})\]\((?:image-url|#|image\.png)\)"#,
+            with: "![Figure: $1]",
+            options: .regularExpression
+        )
+        // Empty alt with invented URL: ![](https://...) -> ![Figure]
+        result = result.replacingOccurrences(
+            of: #"!\[\]\(https?://[^)]*\)"#,
+            with: "![Figure]",
+            options: .regularExpression
+        )
+        return result
+    }
+
     private static func stripPage(_ text: String, badHeads: Set<String>, badTails: Set<String>) -> String {
         var result = lines(text)
         // Strip at most one head and one tail line per page.

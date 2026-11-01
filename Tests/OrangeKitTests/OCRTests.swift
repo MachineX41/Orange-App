@@ -334,3 +334,50 @@ func XCTAssertThrowsErrorAsync(_ expression: @autoclosure () async throws -> som
         // Expected.
     }
 }
+
+final class OCRPostprocessTests: XCTestCase {
+    func testStripRunningHeaders() {
+        let pages = [
+            "Nature Journal\nBody one\nPage 1",
+            "Nature Journal\nBody two\nPage 2",
+            "Nature Journal\nBody three\nPage 3",
+        ]
+        let out = OCRPostprocess.stripRunningHeaders(pages)
+        XCTAssertEqual(out, ["Body one\nPage 1", "Body two\nPage 2", "Body three\nPage 3"])
+    }
+
+    func testStripRunningHeadersNeedsThreePages() {
+        let pages = ["H\nA", "H\nB"]
+        XCTAssertEqual(OCRPostprocess.stripRunningHeaders(pages), pages)
+    }
+
+    func testExtractImagesFindsFigures() throws {
+        let pdf = URL(fileURLWithPath: "/Users/enesdemir/Documents/ap_articles/reference/41598_2026_Article_49129.pdf")
+        guard FileManager.default.fileExists(atPath: pdf.path) else {
+            throw XCTSkip("reference article not present")
+        }
+        let dir = try makeTempDirectory()
+        let pages = try PDFImageExtractor.extractImages(from: pdf, into: dir, baseName: "article")
+        XCTAssertEqual(pages.count, 12)
+        let total = pages.flatMap { $0 }.count
+        XCTAssertGreaterThan(total, 0, "expected embedded figures")
+        for rel in pages.flatMap({ $0 }) {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent(rel).path))
+        }
+    }
+
+    func testSanitizeFigureURLs() {
+        XCTAssertEqual(
+            OCRPostprocess.sanitizeFigureURLs("x\n![](https://i.imgur.com/abc.png)\ny"),
+            "x\n![Figure: ]\ny"
+        )
+        XCTAssertEqual(
+            OCRPostprocess.sanitizeFigureURLs("![](image-url)"),
+            "![Figure: ]"
+        )
+        XCTAssertEqual(
+            OCRPostprocess.sanitizeFigureURLs("![Fig 1](figure-p3-1.png)"),
+            "![Fig 1](figure-p3-1.png)"
+        )
+    }
+}

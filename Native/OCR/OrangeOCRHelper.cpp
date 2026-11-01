@@ -114,8 +114,9 @@ std::string pinnedDocumentPrompt() {
            "Tables should be expressed as HTML tables, formulas should be represented using LATEX format, "
            "and the parsing should be organized according to the reading order. "
            "Preserve all visible text, headings and lists. "
-           "For figures, photos, diagrams and charts: do not describe their pixels; emit a single placeholder line "
-           "like ![Figure: <short caption from the document, or 'figure N'>] at the position where the figure appears. "
+           "For figures, photos, diagrams and charts: do not describe pixels and do not add image URLs; "
+           "emit one line with an exclamation mark, square brackets containing the words Figure colon plus the "
+           "figure's own caption from the document, and nothing in parentheses, at the figure position. "
            "Do not translate, summarize, or invent content.";
 }
 
@@ -125,10 +126,10 @@ std::string pinnedPrompt(const std::string& modelID, const std::string& mode) {
         // Short-prompt models (GLM/Paddle/dots/DeepSeek) were trained on terse
         // OCR triggers; the full Markdown instruction makes them stop early.
         // Keep the trigger short and let the chat template carry the task.
-        if (modelID == "glm-ocr") return "Text Recognition: markdown, figures as ![Figure: caption].";
-        if (modelID == "paddleocr-vl-1.6") return "OCR: markdown, figures as ![Figure: caption].";
-        if (modelID == "dots-ocr") return "Extract the text content from this image as markdown. Figures as ![Figure: caption].";
-        if (modelID == "deepseek-ocr-2") return "Free OCR markdown, figures as ![Figure: caption].";
+        if (modelID == "glm-ocr") return "Text Recognition: markdown. Figures as bracket placeholders, no URLs.";
+        if (modelID == "paddleocr-vl-1.6") return "OCR: markdown. Figures as bracket placeholders, no URLs.";
+        if (modelID == "dots-ocr") return "Extract the text content from this image as markdown. Figures as bracket placeholders, no URLs.";
+        if (modelID == "deepseek-ocr-2") return "Free OCR markdown. Figures as bracket placeholders, no URLs.";
         return pinnedDocumentPrompt();
     }
     if (modelID == "glm-ocr") return "Text Recognition:";

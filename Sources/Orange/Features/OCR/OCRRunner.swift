@@ -148,8 +148,8 @@ final class OCRRunner {
     }
 
     func exportMarkdown(page: OCRWorkspaceModel.PageState) throws -> URL {
-        let markdown = page.editedMarkdown.isEmpty ? (page.markdown ?? page.text) : page.editedMarkdown
-        return try write(text: markdown, extension: "md", source: page.sourceURL)
+        let raw = page.editedMarkdown.isEmpty ? (page.markdown ?? page.text) : page.editedMarkdown
+        return try write(text: OCRPostprocess.sanitizeFigureURLs(raw), extension: "md", source: page.sourceURL)
     }
 
     func exportAllMarkdown() throws -> URL {
@@ -157,8 +157,23 @@ final class OCRRunner {
             $0.editedMarkdown.isEmpty ? ($0.markdown ?? $0.text) : $0.editedMarkdown
         }
         let stripped = OCRPostprocess.stripRunningHeaders(bodies)
+        // Real embedded images per source page, appended as local references.
+        var imageRefs: [[String]] = []
+        if let source = model.sources.first,
+           Catalog.kind(for: source.url) == .pdf {
+            let dir = OutputLocation.directory(beside: source.url)
+            imageRefs = (try? PDFImageExtractor.extractImages(
+                from: source.url, into: dir,
+                baseName: OutputLocation.baseName(source.url))) ?? []
+        }
         let markdown = stripped.enumerated().map { index, body in
-            "<!-- page \(index + 1) -->\n\n\(body)"
+            var section = "<!-- page \(index + 1) -->\n\n\(OCRPostprocess.sanitizeFigureURLs(body))"
+            if index < imageRefs.count {
+                for ref in imageRefs[index] {
+                    section += "\n\n![Figure](\(ref))"
+                }
+            }
+            return section
         }.joined(separator: "\n\n---\n\n")
         let base = model.sources.first?.url ?? URL(fileURLWithPath: "OCR.md")
         return try write(text: markdown, extension: "md", source: base)
