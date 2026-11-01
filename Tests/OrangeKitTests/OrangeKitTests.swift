@@ -258,6 +258,22 @@ final class MediaPipelineTests: XCTestCase {
         let frames = try await VideoEditor.exportFrames(video, times: [0.5], format: .png, progress: nil)
         XCTAssertEqual(frames.first?.pathExtension, "png")
 
+        let before = try video.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        let converted = try await VideoEditor.convert(video, to: .mp4, progress: nil)
+        let after = try converted.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        let convertedInfo = try await VideoEditor.info(converted)
+        XCTAssertLessThan(after, before / 2)
+        XCTAssertEqual(convertedInfo.size.width, info.size.width, accuracy: 2)
+        XCTAssertEqual(convertedInfo.size.height, info.size.height, accuracy: 2)
+        XCTAssertEqual(convertedInfo.duration, info.duration, accuracy: 0.2)
+        XCTAssertTrue(convertedInfo.hasAudio)
+
+        let bloated = VideoEditor.compactVideoBitrate(pixels: 1920 * 1080, fps: 30, sourceBitsPerSecond: 20_000_000, hevc: true)
+        XCTAssertEqual(bloated, 7_464_960)
+        let efficient = VideoEditor.compactVideoBitrate(pixels: 1920 * 1080, fps: 30, sourceBitsPerSecond: 4_000_000, hevc: true)
+        XCTAssertEqual(efficient, 3_200_000)
+        XCTAssertLessThan(efficient, 4_000_000)
+
         let clean = try await MetadataKit.strip(video, progress: nil)
         XCTAssertTrue(FileManager.default.fileExists(atPath: clean.path))
     }

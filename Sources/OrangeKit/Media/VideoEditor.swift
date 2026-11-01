@@ -143,11 +143,324 @@ public enum VideoEditor {
             return output
         case .mp4, .mov, .m4v:
             let output = destination(for: url, suffix: nil, ext: target.fileExtension)
-            try await export(AVURLAsset(url: url), preset: AVAssetExportPresetPassthrough, to: output, progress: progress)
+            try await transcode(url, to: output, progress: progress)
             return output
         default:
             throw OrangeError.unsupported(target.rawValue.uppercased())
         }
+    }
+
+    /// Original frame size, HEVC when the Mac can encode it, at a rate that stays visually clean and under the source.
+    /// A container copy keeps every bit and therefore the same file size. This re-encode is what actually shrinks a .mov.
+    static func transcode(_ url: URL, to output: URL, progress: ProgressHandler?) async throws {
+        let asset = AVURLAsset(url: url)
+        guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
+            throw OrangeError.unsupported(url.pathExtension.uppercased())
+        }
+        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+        let (natural, transform, nominalRate) = try await videoTrack.load(.naturalSize, .preferredTransform, .nominalFrameRate)
+        let dataRate = try await videoTrack.load(.estimatedDataRate)
+        let duration = try await asset.load(.duration).seconds
+        let description = try await videoTrack.load(.formatDescriptions).first
+        let size = evenSize(CGSize(width: abs(natural.width), height: abs(natural.height)))
+        guard size.width >= 2, size.height >= 2 else { throw OrangeError.unsupported(url.pathExtension.uppercased()) }
+
+        let fps = nominalRate > 1 ? Double(nominalRate) : 30
+        var sourceRate = Double(dataRate)
+        if sourceRate < 1, duration > 0, let bytes = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            sourceRate = Double(bytes) * 8 / duration
+        }
+        let pixels = size.width * size.height
+        let color = description.flatMap(colorProperties(for:))
+        let tenBit = description.map(wantsTenBit) ?? false
+        let fullRange = description.map(isFullRange) ?? false
+        let audio = await audioPlan(for: audioTrack)
+
+        let attempts: [(OSType, AVVideoCodecType, Bool)] = tenBit
+            ? [
+                (pixelFormat(tenBit: true, fullRange: fullRange), .hevc, true),
+                (kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, .hevc, true),
+                (kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, .h264, false),
+            ]
+            : [
+                (pixelFormat(tenBit: false, fullRange: fullRange), .hevc, true),
+                (kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, .h264, false),
+            ]
+
+        var last = output.lastPathComponent
+        for (pixel, codec, hevc) in attempts {
+            let bitrate = compactVideoBitrate(pixels: pixels, fps: fps, sourceBitsPerSecond: sourceRate, hevc: hevc)
+            do {
+                try await write(
+                    asset: asset,
+                    videoTrack: videoTrack,
+                    audioTrack: audioTrack,
+                    audio: audio,
+                    to: output,
+                    size: size,
+                    fps: fps,
+                    transform: transform,
+                    pixelFormat: pixel,
+                    codec: codec,
+                    bitrate: bitrate,
+                    color: color,
+                    duration: duration,
+                    progress: progress
+                )
+                return
+            } catch TranscodeFailure.setup(let message) {
+                try? FileManager.default.removeItem(at: output)
+                last = message
+            } catch TranscodeFailure.encode(let error) {
+                try? FileManager.default.removeItem(at: output)
+                throw error
+            } catch {
+                try? FileManager.default.removeItem(at: output)
+                throw error
+            }
+        }
+        throw OrangeError.toolFailed(last)
+    }
+
+    /// Bits per second for a same-resolution encode that still looks clean.
+    /// A bloated master lands on the transparent rate. A file that is already efficient only loses a little, so it shrinks without being chewed up.
+    static func compactVideoBitrate(pixels: Double, fps: Double, sourceBitsPerSecond: Double, hevc: Bool) -> Int {
+        let frames = max(fps, 1)
+        let clean = pixels * frames * (hevc ? 0.12 : 0.20)
+        let source = max(sourceBitsPerSecond, 0)
+        let target = source > clean * 1.25 ? clean : (source > 1_000 ? min(source * 0.80, clean) : clean)
+        if source > 1_000 {
+            return max(Int(min(target, source * 0.92).rounded()), 1)
+        }
+        return Int(max(target, 250_000).rounded())
+    }
+
+    private struct AudioPlan {
+        var passthrough: Bool
+        var sampleRate: Double
+        var channels: Int
+    }
+
+    private enum TranscodeFailure: Error {
+        case setup(String)
+        case encode(Error)
+    }
+
+    private static func audioPlan(for track: AVAssetTrack?) async -> AudioPlan? {
+        guard let track else { return nil }
+        guard let description = try? await track.load(.formatDescriptions).first,
+              let basic = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee else {
+            return AudioPlan(passthrough: false, sampleRate: 48_000, channels: 2)
+        }
+        let channels = min(max(Int(basic.mChannelsPerFrame), 1), 2)
+        let rate = basic.mSampleRate > 0 ? basic.mSampleRate : 48_000
+        let standard = [8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000]
+        let sampleRate = standard.contains(Int(rate.rounded())) ? rate : 48_000
+        return AudioPlan(passthrough: basic.mFormatID == kAudioFormatMPEG4AAC, sampleRate: sampleRate, channels: channels)
+    }
+
+    private static func pixelFormat(tenBit: Bool, fullRange: Bool) -> OSType {
+        switch (tenBit, fullRange) {
+        case (true, true): kCVPixelFormatType_420YpCbCr10BiPlanarFullRange
+        case (true, false): kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+        case (false, true): kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+        case (false, false): kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        }
+    }
+
+    private static func wantsTenBit(_ description: CMFormatDescription) -> Bool {
+        guard let extensions = CMFormatDescriptionGetExtensions(description) as? [String: Any] else { return false }
+        if let bits = extensions[kCMFormatDescriptionExtension_BitsPerComponent as String] as? NSNumber, bits.intValue > 8 {
+            return true
+        }
+        let transfer = extensions[kCVImageBufferTransferFunctionKey as String] as? String
+        return transfer == (AVVideoTransferFunction_SMPTE_ST_2084_PQ as String)
+            || transfer == (AVVideoTransferFunction_ITU_R_2100_HLG as String)
+    }
+
+    private static func isFullRange(_ description: CMFormatDescription) -> Bool {
+        guard let extensions = CMFormatDescriptionGetExtensions(description) as? [String: Any] else { return false }
+        return (extensions[kCMFormatDescriptionExtension_FullRangeVideo as String] as? NSNumber)?.boolValue == true
+    }
+
+    private static func colorProperties(for description: CMFormatDescription) -> [String: Any]? {
+        guard let extensions = CMFormatDescriptionGetExtensions(description) as? [String: Any] else { return nil }
+        var color: [String: Any] = [:]
+        if let value = extensions[kCVImageBufferColorPrimariesKey as String] { color[AVVideoColorPrimariesKey] = value }
+        if let value = extensions[kCVImageBufferTransferFunctionKey as String] { color[AVVideoTransferFunctionKey] = value }
+        if let value = extensions[kCVImageBufferYCbCrMatrixKey as String] { color[AVVideoYCbCrMatrixKey] = value }
+        return color.isEmpty ? nil : color
+    }
+
+    private static func write(
+        asset: AVAsset,
+        videoTrack: AVAssetTrack,
+        audioTrack: AVAssetTrack?,
+        audio: AudioPlan?,
+        to output: URL,
+        size: CGSize,
+        fps: Double,
+        transform: CGAffineTransform,
+        pixelFormat: OSType,
+        codec: AVVideoCodecType,
+        bitrate: Int,
+        color: [String: Any]?,
+        duration: Double,
+        progress: ProgressHandler?
+    ) async throws {
+        try? FileManager.default.removeItem(at: output)
+        let reader = try AVAssetReader(asset: asset)
+        let videoOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: [
+            kCVPixelBufferPixelFormatTypeKey as String: pixelFormat,
+        ])
+        videoOutput.alwaysCopiesSampleData = false
+        guard reader.canAdd(videoOutput) else { throw TranscodeFailure.setup(output.lastPathComponent) }
+        reader.add(videoOutput)
+
+        let writer = try AVAssetWriter(outputURL: output, fileType: fileType(for: output.pathExtension))
+        writer.shouldOptimizeForNetworkUse = output.pathExtension.lowercased() != "mov"
+        var compression: [String: Any] = [
+            AVVideoAverageBitRateKey: bitrate,
+            AVVideoExpectedSourceFrameRateKey: max(Int(fps.rounded()), 1),
+            AVVideoMaxKeyFrameIntervalKey: max(Int(fps.rounded()) * 2, 2),
+            AVVideoAllowFrameReorderingKey: true,
+        ]
+        if codec == .h264 {
+            compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
+        }
+        var videoSettings: [String: Any] = [
+            AVVideoCodecKey: codec,
+            AVVideoWidthKey: Int(size.width),
+            AVVideoHeightKey: Int(size.height),
+            AVVideoCompressionPropertiesKey: compression,
+        ]
+        if let color { videoSettings[AVVideoColorPropertiesKey] = color }
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+        videoInput.expectsMediaDataInRealTime = false
+        videoInput.transform = transform
+        guard writer.canAdd(videoInput) else { throw TranscodeFailure.setup(output.lastPathComponent) }
+        writer.add(videoInput)
+
+        var audioOutput: AVAssetReaderTrackOutput?
+        var audioInput: AVAssetWriterInput?
+        if let audioTrack, let audio {
+            let attached = attachAudio(audio, track: audioTrack, reader: reader, writer: writer)
+            audioOutput = attached?.output
+            audioInput = attached?.input
+        }
+
+        guard writer.startWriting() else {
+            throw TranscodeFailure.setup(writer.error?.localizedDescription ?? output.lastPathComponent)
+        }
+        writer.startSession(atSourceTime: .zero)
+        guard reader.startReading() else {
+            writer.cancelWriting()
+            throw TranscodeFailure.setup(reader.error?.localizedDescription ?? output.lastPathComponent)
+        }
+
+        var videoDone = false
+        var audioDone = audioInput == nil
+        var reported = 0.0
+        var producedVideo = false
+        while !videoDone || !audioDone {
+            if Task.isCancelled {
+                reader.cancelReading()
+                writer.cancelWriting()
+                throw OrangeError.cancelled
+            }
+            var wrote = false
+            if !videoDone, videoInput.isReadyForMoreMediaData {
+                if let sample = videoOutput.copyNextSampleBuffer() {
+                    guard videoInput.append(sample) else {
+                        reader.cancelReading()
+                        throw TranscodeFailure.encode(OrangeError.toolFailed(writer.error?.localizedDescription ?? output.lastPathComponent))
+                    }
+                    producedVideo = true
+                    if duration > 0 {
+                        let fraction = min(max(CMSampleBufferGetPresentationTimeStamp(sample).seconds / duration, 0), 0.99)
+                        if fraction - reported >= 0.01 {
+                            reported = fraction
+                            progress?(fraction)
+                        }
+                    }
+                } else if reader.status == .failed {
+                    writer.cancelWriting()
+                    throw TranscodeFailure.encode(OrangeError.toolFailed(reader.error?.localizedDescription ?? output.lastPathComponent))
+                } else {
+                    videoInput.markAsFinished()
+                    videoDone = true
+                }
+                wrote = true
+            }
+            if !audioDone, let audioInput, let audioOutput, audioInput.isReadyForMoreMediaData {
+                if let sample = audioOutput.copyNextSampleBuffer() {
+                    guard audioInput.append(sample) else {
+                        reader.cancelReading()
+                        throw TranscodeFailure.encode(OrangeError.toolFailed(writer.error?.localizedDescription ?? output.lastPathComponent))
+                    }
+                } else if reader.status == .failed {
+                    writer.cancelWriting()
+                    throw TranscodeFailure.encode(OrangeError.toolFailed(reader.error?.localizedDescription ?? output.lastPathComponent))
+                } else {
+                    audioInput.markAsFinished()
+                    audioDone = true
+                }
+                wrote = true
+            }
+            if !wrote { try await Task.sleep(for: .milliseconds(2)) }
+        }
+        guard producedVideo else {
+            writer.cancelWriting()
+            throw TranscodeFailure.encode(OrangeError.unreadable(output.lastPathComponent))
+        }
+        await writer.finishWriting()
+        guard writer.status == .completed else {
+            throw TranscodeFailure.encode(OrangeError.toolFailed(writer.error?.localizedDescription ?? output.lastPathComponent))
+        }
+        progress?(1)
+    }
+
+    private static func attachAudio(
+        _ audio: AudioPlan,
+        track: AVAssetTrack,
+        reader: AVAssetReader,
+        writer: AVAssetWriter
+    ) -> (output: AVAssetReaderTrackOutput, input: AVAssetWriterInput)? {
+        func pair(passthrough: Bool) -> (AVAssetReaderTrackOutput, AVAssetWriterInput) {
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: passthrough ? nil : pcmSettings(audio))
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: passthrough ? nil : aacSettings(audio))
+            input.expectsMediaDataInRealTime = false
+            return (output, input)
+        }
+        var (output, input) = pair(passthrough: audio.passthrough)
+        if !reader.canAdd(output) || !writer.canAdd(input), audio.passthrough {
+            (output, input) = pair(passthrough: false)
+        }
+        guard reader.canAdd(output), writer.canAdd(input) else { return nil }
+        reader.add(output)
+        writer.add(input)
+        return (output, input)
+    }
+
+    private static func pcmSettings(_ audio: AudioPlan) -> [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+            AVSampleRateKey: audio.sampleRate,
+            AVNumberOfChannelsKey: audio.channels,
+        ]
+    }
+
+    private static func aacSettings(_ audio: AudioPlan) -> [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: audio.sampleRate,
+            AVNumberOfChannelsKey: audio.channels,
+            AVEncoderBitRateKey: audio.channels > 1 ? 256_000 : 160_000,
+        ]
     }
 
     // MARK: Editing
