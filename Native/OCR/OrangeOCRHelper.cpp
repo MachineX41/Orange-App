@@ -113,7 +113,10 @@ std::string pinnedDocumentPrompt() {
     return "Extract all information from the document image and represent it in markdown format. "
            "Tables should be expressed as HTML tables, formulas should be represented using LATEX format, "
            "and the parsing should be organized according to the reading order. "
-           "Preserve all visible text, headings and lists. Do not translate, summarize, or invent content.";
+           "Preserve all visible text, headings and lists. "
+           "For figures, photos, diagrams and charts: do not describe their pixels; emit a single placeholder line "
+           "like ![Figure: <short caption from the document, or 'figure N'>] at the position where the figure appears. "
+           "Do not translate, summarize, or invent content.";
 }
 
 std::string pinnedPrompt(const std::string& modelID, const std::string& mode) {
