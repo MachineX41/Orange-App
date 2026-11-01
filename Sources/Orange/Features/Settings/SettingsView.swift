@@ -8,73 +8,81 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var runtime = runtime
         TabView {
-            Form {
-                Section(L("Appearance", "Görünüm")) {
-                    Picker(L("Theme", "Tema"), selection: $runtime.appearance) {
-                        Text(L("System", "Sistem")).tag(AppearanceChoice.system)
-                        Text(L("Light", "Açık")).tag(AppearanceChoice.light)
-                        Text(L("Dark", "Koyu")).tag(AppearanceChoice.dark)
+            SettingsPage {
+                SettingsGroup(title: L("Appearance", "Görünüm"), symbol: "circle.lefthalf.filled") {
+                    SettingsRow(title: L("Theme", "Tema")) {
+                        Picker(L("Theme", "Tema"), selection: $runtime.appearance) {
+                            Text(L("System", "Sistem")).tag(AppearanceChoice.system)
+                            Text(L("Light", "Açık")).tag(AppearanceChoice.light)
+                            Text(L("Dark", "Koyu")).tag(AppearanceChoice.dark)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 220)
                     }
-                    .pickerStyle(.segmented)
-                    Toggle(L("Show Orange in the menu bar", "Orange’ı menü çubuğunda göster"), isOn: $runtime.showInMenuBar)
+                    SettingsToggle(title: L("Show Orange in the menu bar", "Orange’ı menü çubuğunda göster"), isOn: $runtime.showInMenuBar)
                 }
-                Section(L("When a job finishes", "Bir iş bittiğinde")) {
-                    Toggle(L("Play a sound", "Ses çal"), isOn: $runtime.soundOnDone)
-                    Toggle(L("Reveal the result in Finder", "Sonucu Finder’da göster"), isOn: $runtime.revealWhenDone)
+                SettingsGroup(title: L("When a job finishes", "Bir iş bittiğinde"), symbol: "checkmark.circle") {
+                    SettingsToggle(title: L("Play a sound", "Ses çal"), isOn: $runtime.soundOnDone)
+                    SettingsToggle(title: L("Reveal the result in Finder", "Sonucu Finder’da göster"), isOn: $runtime.revealWhenDone)
                 }
-                Section(L("Output", "Çıktı")) {
-                    LabeledContent(L("Save results", "Sonuçları kaydet")) {
-                        VStack(alignment: .trailing, spacing: 6) {
-                            Text(runtime.customOutputPath.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? L("Next to the original", "Orijinalin yanına"))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            HStack {
-                                Button(L("Choose Folder…", "Klasör Seç…")) { chooseFolder() }
-                                if runtime.customOutputPath != nil {
-                                    Button(L("Use Original Folder", "Orijinal Klasörü Kullan")) { runtime.customOutputPath = nil }
-                                }
+                SettingsGroup(title: L("Output", "Çıktı"), symbol: "folder") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L("Save results", "Sonuçları kaydet"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(runtime.customOutputPath.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? L("Next to the original", "Orijinalin yanına"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        HStack(spacing: 8) {
+                            Button(L("Choose Folder…", "Klasör Seç…")) { chooseFolder() }
+                            if runtime.customOutputPath != nil {
+                                Button(L("Use Original Folder", "Orijinal Klasörü Kullan")) { runtime.customOutputPath = nil }
                             }
                         }
+                        .buttonStyle(.glass)
+                        .tint(nil)
                     }
-                    LabeledContent(L("Default image quality", "Varsayılan görsel kalitesi")) {
-                        HStack {
-                            Slider(value: $runtime.imageQuality, in: 0.4...1).frame(width: 160).tint(OrangeTheme.accent)
-                            Text("\(Int(runtime.imageQuality * 100))%").monospacedDigit().frame(width: 40)
+                    SettingsRow(title: L("Default image quality", "Varsayılan görsel kalitesi")) {
+                        HStack(spacing: 8) {
+                            Slider(value: $runtime.imageQuality, in: 0.4...1).frame(width: 150).tint(OrangeTheme.accent)
+                            Text("\(Int(runtime.imageQuality * 100))%").monospacedDigit().font(.system(size: 12, weight: .medium)).frame(width: 40, alignment: .trailing)
                         }
                     }
                 }
             }
-            .formStyle(.grouped)
             .tabItem { Label(L("General", "Genel"), systemImage: "gearshape") }
 
-            Form {
-                Section(L("Drag wheel", "Sürükleme çarkı")) {
-                    Toggle(L("Show the wheel while dragging files", "Dosya sürüklerken çarkı göster"), isOn: $runtime.wheelEnabled)
-                    Toggle(L("Haptic feedback on slices", "Dilimlerde dokunsal geri bildirim"), isOn: $runtime.hapticOnWheel)
+            SettingsPage {
+                SettingsGroup(title: L("Drag wheel", "Sürükleme çarkı"), symbol: "circle.circle") {
+                    SettingsToggle(title: L("Show the wheel while dragging files", "Dosya sürüklerken çarkı göster"), isOn: $runtime.wheelEnabled)
+                    SettingsToggle(title: L("Haptic feedback on slices", "Dilimlerde dokunsal geri bildirim"), isOn: $runtime.hapticOnWheel)
                 }
-                Section(L("How it works", "Nasıl çalışır")) {
+                SettingsGroup(title: L("How it works", "Nasıl çalışır"), symbol: "hand.draw") {
                     ForEach(WheelMode.allCases, id: \.self) { mode in
                         HStack(spacing: 10) {
                             KeyCap(text: mode.key)
-                            Text(mode.title).bold()
+                            Text(mode.title).font(.system(size: 13, weight: .semibold))
                             Spacer()
-                            Text(description(mode)).foregroundStyle(.secondary)
+                            Text(description(mode)).font(.system(size: 12)).foregroundStyle(.secondary)
                         }
                     }
                     Text(L("Start dragging any file, in Finder or any app, then press a key. The wheel opens where your pointer is and stays fixed until you let go. Drop the file on a slice. Releasing elsewhere cancels.", "Finder’da ya da herhangi bir uygulamada bir dosyayı sürüklemeye başlayın, sonra tuşa basın. Çark imlecin olduğu yerde açılır ve bırakana kadar sabit kalır. Dosyayı bir dilimin üzerine bırakın. Başka bir yere bırakırsanız iptal olur."))
-                        .font(.callout)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .formStyle(.grouped)
             .tabItem { Label(L("Wheel", "Çark"), systemImage: "circle.circle") }
 
             PrivacySettings()
                 .tabItem { Label(L("Privacy", "Gizlilik"), systemImage: "hand.raised") }
         }
         .tint(OrangeTheme.accent)
-        .frame(width: 600, height: 540)
+        .frame(width: 640, height: 560)
+        .background(OrangeBackdrop())
+        .background(SettingsChrome())
     }
 
     private func description(_ mode: WheelMode) -> String {
@@ -103,47 +111,48 @@ struct PrivacySettings: View {
     @State private var confirmClear = false
 
     var body: some View {
-        Form {
-            Section {
+        SettingsPage {
+            SettingsGroup(title: L("Folder access", "Klasör erişimi"), symbol: "folder.badge.gearshape") {
                 ForEach(ProtectedFolder.allCases) { folder in
                     FolderRow(folder: folder)
                         .padding(.horizontal, -16)
                 }
-            } header: {
-                Text(L("Folder access", "Klasör erişimi"))
-            } footer: {
                 Text(L("macOS shows its own prompt the first time. Declined folders can be turned on in System Settings › Privacy & Security › Files & Folders.", "macOS ilk seferde kendi onay penceresini gösterir. Reddedilen klasörler Sistem Ayarları › Gizlilik ve Güvenlik › Dosyalar ve Klasörler’den açılabilir."))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Section(L("Startup", "Başlangıç")) {
-                Toggle(L("Open Orange at login", "Orange’ı girişte aç"), isOn: Binding(get: { permissions.opensAtLogin }, set: { permissions.setOpensAtLogin($0) }))
+            SettingsGroup(title: L("Startup", "Başlangıç"), symbol: "power") {
+                SettingsToggle(title: L("Open Orange at login", "Orange’ı girişte aç"), isOn: Binding(get: { permissions.opensAtLogin }, set: { permissions.setOpensAtLogin($0) }))
                 if permissions.loginItem == .requiresApproval {
                     Text(L("Approve Orange under System Settings › General › Login Items.", "Sistem Ayarları › Genel › Giriş Öğeleri’nden Orange’ı onaylayın."))
-                        .font(.callout)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 if let error = permissions.loginItemError {
-                    Text(error).font(.callout).foregroundStyle(OrangeTheme.ember)
+                    Text(error).font(.system(size: 12)).foregroundStyle(OrangeTheme.ember)
                 }
             }
-
-            Section(L("Your data", "Verileriniz")) {
-                LabeledContent(L("Processing", "İşleme"), value: L("On this Mac only", "Yalnızca bu Mac’te"))
-                LabeledContent(L("Analytics and tracking", "Analiz ve takip"), value: L("None", "Yok"))
+            SettingsGroup(title: L("Your data", "Verileriniz"), symbol: "lock") {
+                SettingsFact(title: L("Processing", "İşleme"), value: L("On this Mac only", "Yalnızca bu Mac’te"))
+                SettingsFact(title: L("Analytics and tracking", "Analiz ve takip"), value: L("None", "Yok"))
                 if let date = Consent.acceptedAt {
-                    LabeledContent(L("Terms accepted", "Koşullar kabul edildi"), value: date.formatted(date: .abbreviated, time: .shortened))
+                    SettingsFact(title: L("Terms accepted", "Koşullar kabul edildi"), value: date.formatted(date: .abbreviated, time: .shortened))
                 }
-                HStack {
+                HStack(spacing: 14) {
                     Link(L("Privacy Notice", "Gizlilik Bildirimi"), destination: Consent.privacyURL)
                     Link(L("Terms of Use", "Kullanım Koşulları"), destination: Consent.termsURL)
-                    Spacer()
-                    Button(L("Clear History and Shelf…", "Geçmişi ve Rafı Temizle…")) { confirmClear = true }
                 }
-                Button(L("Show Welcome Tour", "Tanıtımı Göster")) { runtime.replayOnboarding() }
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(OrangeTheme.accent)
+                HStack(spacing: 8) {
+                    Button(L("Clear History and Shelf…", "Geçmişi ve Rafı Temizle…")) { confirmClear = true }
+                    Button(L("Show Welcome Tour", "Tanıtımı Göster")) { runtime.replayOnboarding() }
+                }
+                .buttonStyle(.glass)
+                .tint(nil)
             }
         }
-        .formStyle(.grouped)
         .onAppear { permissions.refreshLoginItem() }
         .confirmationDialog(L("Clear history and shelf?", "Geçmiş ve raf temizlensin mi?"), isPresented: $confirmClear) {
             Button(L("Clear", "Temizle"), role: .destructive) {
@@ -153,6 +162,101 @@ struct PrivacySettings: View {
         } message: {
             Text(L("Your files stay where they are. Only Orange’s list of them is removed.", "Dosyalarınız yerinde kalır. Yalnızca Orange’ın onlara ait listesi silinir."))
         }
+    }
+}
+
+/// Scrollable settings page on the same warm backdrop as the main panel.
+private struct SettingsPage<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                content()
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollContentBackground(.hidden)
+        .background(OrangeBackdrop())
+    }
+}
+
+private struct SettingsGroup<Content: View>: View {
+    var title: String
+    var symbol: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(title: title, symbol: symbol)
+            VStack(alignment: .leading, spacing: 12) {
+                content()
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassCard(radius: 18)
+        }
+    }
+}
+
+private struct SettingsRow<Control: View>: View {
+    var title: String
+    @ViewBuilder var control: () -> Control
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+            Spacer(minLength: 12)
+            control()
+        }
+    }
+}
+
+private struct SettingsToggle: View {
+    var title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        SettingsRow(title: title) {
+            Toggle(title, isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(OrangeTheme.accent)
+        }
+    }
+}
+
+private struct SettingsFact: View {
+    var title: String
+    var value: String
+
+    var body: some View {
+        HStack {
+            Text(title).font(.system(size: 13, weight: .medium))
+            Spacer()
+            Text(value).font(.system(size: 12.5)).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Clears the system window fill so the panel backdrop shows through the Settings window.
+private struct SettingsChrome: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { Self.apply(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { Self.apply(nsView.window) }
+    }
+
+    private static func apply(_ window: NSWindow?) {
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
+        window?.titlebarAppearsTransparent = true
     }
 }
 
