@@ -82,6 +82,11 @@ struct OCRModelsView: View {
                     .foregroundStyle(OrangeTheme.ember)
                     .textSelection(.enabled)
             }
+            if let perf = perfText(row.entry) {
+                Text(perf)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
             if let score = row.entry.scoreNote {
                 Text(score)
                     .font(.system(size: 11.5))
@@ -104,6 +109,24 @@ struct OCRModelsView: View {
         let modes = entry.modes.map { $0.rawValue }.joined(separator: " + ")
         let size = ByteCountFormatter.string(fromByteCount: entry.totalBytes, countStyle: .file)
         return "\(modes) · \(size)"
+    }
+
+    /// Measured on-device figures from docs/BENCHMARK.md (12-page article, Metal).
+    private func perfText(_ entry: OCRModelEntry) -> String? {
+        switch entry.id {
+        case .appleVision:
+            return nil
+        case .glmOCR:
+            return L("~2.2 GB RAM · ~23s/page · compact output", "~2,2 GB RAM · ~23sn/sayfa · özlü çıktı")
+        case .paddleOCRVL16:
+            return L("~2.2 GB RAM · ~9s/page · fastest, Metal only", "~2,2 GB RAM · ~9sn/sayfa · en hızlı, yalnız Metal")
+        case .qwen3VL2B:
+            return L("~3.8 GB RAM · ~36s/page · most complete", "~3,8 GB RAM · ~36sn/sayfa · en eksiksiz")
+        case .dotsOCR:
+            return L("~3.8 GB RAM · ~91s/page · slowest", "~3,8 GB RAM · ~91sn/sayfa · en yavaş")
+        case .deepseekOCR2:
+            return L("~4.4 GB RAM · ~21s/page · heaviest", "~4,4 GB RAM · ~21sn/sayfa · en ağır")
+        }
     }
 
     private func metaText(_ entry: OCRModelEntry) -> String {
