@@ -60,6 +60,9 @@ struct MainWindow: View {
             .tint(OrangeTheme.accent)
             .animation(.spring(response: 0.32, dampingFraction: 0.86), value: runtime.section)
             .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 260)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                SettingsSidebarButton()
+            }
         } detail: {
             ZStack {
                 OrangeBackdrop()
@@ -222,6 +225,53 @@ struct SidebarItem: View {
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// Opens the Settings window. It stays at the bottom of the sidebar, separate from the section selection.
+private struct SettingsSidebarButton: View {
+    @Environment(\.openSettings) private var openSettings
+    @State private var hovered = false
+
+    var body: some View {
+        Button {
+            openSettings()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "gearshape")
+                    .symbolRenderingMode(.monochrome)
+                    .font(.system(size: 13.5, weight: .regular))
+                    .foregroundStyle(OrangeTheme.accent)
+                    .frame(width: 20)
+                Text(L("Settings", "Ayarlar"))
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(.primary)
+            .background {
+                if hovered {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.06))
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovered)
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+        .background(alignment: .top) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 1)
+        }
+        .help("\(L("Settings", "Ayarlar")) (⌘\(AppDelegate.settingsKey))")
     }
 }
 
