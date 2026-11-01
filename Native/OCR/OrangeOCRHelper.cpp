@@ -125,10 +125,10 @@ std::string pinnedPrompt(const std::string& modelID, const std::string& mode) {
         // Short-prompt models (GLM/Paddle/dots/DeepSeek) were trained on terse
         // OCR triggers; the full Markdown instruction makes them stop early.
         // Keep the trigger short and let the chat template carry the task.
-        if (modelID == "glm-ocr") return "Text Recognition: markdown";
-        if (modelID == "paddleocr-vl-1.6") return "OCR markdown:";
-        if (modelID == "dots-ocr") return "Extract the text content from this image as markdown.";
-        if (modelID == "deepseek-ocr-2") return "Free OCR markdown.";
+        if (modelID == "glm-ocr") return "Text Recognition: markdown, figures as ![Figure: caption].";
+        if (modelID == "paddleocr-vl-1.6") return "OCR markdown, figures as ![Figure: caption]:";
+        if (modelID == "dots-ocr") return "Extract the text content from this image as markdown. Figures as ![Figure: caption].";
+        if (modelID == "deepseek-ocr-2") return "Free OCR markdown, figures as ![Figure: caption].";
         return pinnedDocumentPrompt();
     }
     if (modelID == "glm-ocr") return "Text Recognition:";

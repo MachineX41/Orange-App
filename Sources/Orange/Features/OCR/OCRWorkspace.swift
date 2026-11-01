@@ -334,12 +334,20 @@ struct OCRWorkspace: View {
     }
 
     private func exportRow(page: OCRWorkspaceModel.PageState) -> some View {
-        HStack(spacing: 8) {
-            Button(L("Copy", "Kopyala")) { copy(page: page) }
-            Button(L("Copy All", "Tümünü Kopyala")) { copyAll() }
-            Button(L("Save .txt", ".txt Kaydet")) { saveText(page: page) }
-            if hasMarkdown {
-                Button(L("Save .md", ".md Kaydet")) { saveMarkdown(page: page) }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Button(L("Copy", "Kopyala")) { copy(page: page) }
+                Button(L("Copy All", "Tümünü Kopyala")) { copyAll() }
+                Button(L("Save .txt", ".txt Kaydet")) { saveText(page: page) }
+                if hasMarkdown {
+                    Button(L("Save .md", ".md Kaydet")) { saveMarkdown(page: page) }
+                }
+            }
+            HStack(spacing: 8) {
+                Button(L("Save All .txt", "Tümünü .txt Kaydet")) { saveAllText() }
+                if model.pages.contains(where: { $0.markdown != nil }) {
+                    Button(L("Save All .md", "Tümünü .md Kaydet")) { saveAllMarkdown() }
+                }
             }
         }
         .buttonStyle(.glass)
@@ -459,6 +467,24 @@ struct OCRWorkspace: View {
     private func saveMarkdown(page: OCRWorkspaceModel.PageState) {
         do {
             let url = try runner?.exportMarkdown(page: page)
+            if let url { runtime.toast(L("Saved", "Kaydedildi"), url.lastPathComponent, symbol: "checkmark.circle.fill", style: .success, outputs: [url]) }
+        } catch {
+            runtime.notify(error)
+        }
+    }
+
+    private func saveAllText() {
+        do {
+            let url = try runner?.exportAllText()
+            if let url { runtime.toast(L("Saved", "Kaydedildi"), url.lastPathComponent, symbol: "checkmark.circle.fill", style: .success, outputs: [url]) }
+        } catch {
+            runtime.notify(error)
+        }
+    }
+
+    private func saveAllMarkdown() {
+        do {
+            let url = try runner?.exportAllMarkdown()
             if let url { runtime.toast(L("Saved", "Kaydedildi"), url.lastPathComponent, symbol: "checkmark.circle.fill", style: .success, outputs: [url]) }
         } catch {
             runtime.notify(error)
