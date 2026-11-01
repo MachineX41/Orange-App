@@ -1,3 +1,4 @@
+import AppKit
 import OrangeKit
 import SwiftUI
 
@@ -7,9 +8,41 @@ struct MainWindow: View {
     @Namespace private var sidebarSelection
     @State var dropTargeted = false
 
+    @State private var host: NSWindow?
+    @State private var frameBeforeTour: NSRect?
+
     var body: some View {
         @Bindable var runtime = runtime
-        NavigationSplitView {
+        Group {
+            if runtime.showOnboarding {
+                OnboardingView { runtime.finishOnboarding() }
+            } else {
+                panel
+            }
+        }
+        .frame(minWidth: runtime.showOnboarding ? 760 : 940, minHeight: runtime.showOnboarding ? 560 : 620)
+        .toolbar(runtime.showOnboarding ? .hidden : .visible, for: .windowToolbar)
+        .background(WindowReader { window in
+            if host !== window { host = window }
+        })
+        .onAppear {
+            runtime.openWindowAction = openWindow
+            guard runtime.showOnboarding else { return }
+            fit(onboarding: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { fit(onboarding: true) }
+        }
+        .onChange(of: runtime.showOnboarding) { wasShowing, showing in
+            fit(onboarding: showing, restore: wasShowing)
+        }
+        .onChange(of: host) { _, _ in
+            if runtime.showOnboarding { fit(onboarding: true) }
+        }
+    }
+
+    /// The working panel. It stays out of the window until the welcome tour finishes.
+    private var panel: some View {
+        @Bindable var runtime = runtime
+        return NavigationSplitView {
             List {
                 Section {
                     SidebarItem(section: .home, title: L("Home", "Ana Sayfa"), symbol: "house", namespace: sidebarSelection)
@@ -74,16 +107,33 @@ struct MainWindow: View {
             }
         }
         .sheet(isPresented: $runtime.showShortcuts) { ShortcutsSheet() }
-        .background {
-            Color.clear
-                .sheet(isPresented: $runtime.showOnboarding) {
-                    OnboardingView { runtime.finishOnboarding() }
-                        .environment(runtime)
-                }
-        }
         .animation(.easeOut(duration: 0.22), value: runtime.section)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: runtime.localWheel)
-        .onAppear { runtime.openWindowAction = openWindow }
+    }
+
+    /// Onboarding uses the window by itself. Finishing it, or replaying the tour, resizes that same window.
+    private func fit(onboarding showing: Bool, restore: Bool = false) {
+        DispatchQueue.main.async {
+            guard let host else { return }
+            if showing {
+                if host.frame.width > 800 { frameBeforeTour = host.frame }
+                host.titleVisibility = .hidden
+                host.titlebarAppearsTransparent = true
+                host.setContentSize(NSSize(width: 760, height: 560))
+                host.center()
+            } else {
+                host.titleVisibility = .visible
+                host.titlebarAppearsTransparent = false
+                host.title = "Orange"
+                if restore, let frameBeforeTour, frameBeforeTour.width > 800 {
+                    host.setFrame(frameBeforeTour, display: true, animate: true)
+                } else if restore || host.frame.width < 900 {
+                    host.setContentSize(NSSize(width: 1200, height: 800))
+                    host.center()
+                }
+                frameBeforeTour = nil
+            }
+        }
     }
 
     @ViewBuilder private var detail: some View {
@@ -93,6 +143,25 @@ struct MainWindow: View {
         case .library: LibraryView()
         case .shelf: ShelfView()
         case .tools(let kind): ToolsView(kind: kind)
+        }
+    }
+}
+
+/// Reports the window hosting this view once AppKit has attached it.
+private struct WindowReader: NSViewRepresentable {
+    var onResolve: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { [weak view] in
+            if let window = view?.window { onResolve(window) }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { [weak nsView] in
+            if let window = nsView?.window { onResolve(window) }
         }
     }
 }
