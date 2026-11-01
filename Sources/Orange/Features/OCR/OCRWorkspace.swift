@@ -38,6 +38,8 @@ struct OCRWorkspace: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button(L("Add Files", "Dosya Ekle")) { addFiles() }
                     .disabled(model.isRunning)
+                Button(L("Clear", "Temizle")) { model.clear() }
+                    .disabled(model.isRunning || model.sources.isEmpty)
                 Button(L("Manage Models", "Modelleri Yönet")) { openModels() }
             }
         }
