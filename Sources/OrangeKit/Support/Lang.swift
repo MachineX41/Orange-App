@@ -1,15 +1,59 @@
 import CoreGraphics
 import Foundation
+import Observation
 
 public typealias ProgressHandler = @Sendable (Double) -> Void
 
+public enum LanguageChoice: String, CaseIterable, Identifiable, Codable, Sendable {
+    case system
+    case turkish
+    case english
+
+    public var id: String { rawValue }
+}
+
 public enum Lang {
+    public static let defaultsKey = "language"
+
+    /// Views read this while drawing, so changing it redraws every screen that asks for a string.
+    @Observable
+    final class Refresh {
+        static let shared = Refresh()
+        var token = 0
+        private init() {}
+    }
+
+    nonisolated(unsafe) private static var stored: LanguageChoice = {
+        LanguageChoice(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .system
+    }()
+
+    public static var choice: LanguageChoice {
+        get { stored }
+        set {
+            stored = newValue
+            UserDefaults.standard.set(newValue.rawValue, forKey: defaultsKey)
+            let bump = { Refresh.shared.token &+= 1 }
+            if Thread.isMainThread {
+                bump()
+            } else {
+                DispatchQueue.main.async(execute: bump)
+            }
+        }
+    }
+
     public static var isTurkish: Bool {
-        Locale.preferredLanguages.first?.hasPrefix("tr") == true
+        switch stored {
+        case .turkish: true
+        case .english: false
+        case .system: Locale.preferredLanguages.first?.hasPrefix("tr") == true
+        }
     }
 
     public static func t(_ english: String, _ turkish: String) -> String {
-        isTurkish ? turkish : english
+        if Thread.isMainThread {
+            _ = Refresh.shared.token
+        }
+        return isTurkish ? turkish : english
     }
 }
 

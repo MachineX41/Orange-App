@@ -10,6 +10,16 @@ struct SettingsView: View {
         TabView {
             SettingsPage {
                 SettingsGroup(title: L("Appearance", "Görünüm"), symbol: "circle.lefthalf.filled") {
+                    SettingsRow(title: L("Language", "Dil")) {
+                        Picker(L("Language", "Dil"), selection: $runtime.language) {
+                            Text(L("System", "Sistem")).tag(LanguageChoice.system)
+                            Text("Türkçe").tag(LanguageChoice.turkish)
+                            Text("English").tag(LanguageChoice.english)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 280)
+                    }
                     SettingsRow(title: L("Theme", "Tema")) {
                         Picker(L("Theme", "Tema"), selection: $runtime.appearance) {
                             Text(L("System", "Sistem")).tag(AppearanceChoice.system)

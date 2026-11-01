@@ -16,12 +16,19 @@ extension EnvironmentValues {
 @MainActor
 final class EditorWindows: NSObject, NSWindowDelegate {
     static let shared = EditorWindows()
-    private var windows: [NSWindow] = []
+
+    private struct HostedEditor {
+        var window: NSWindow
+        var tool: ToolID
+        var files: [URL]
+    }
+
+    private var editors: [HostedEditor] = []
 
     func present(_ tool: ToolID, files: [URL]) {
         let key = tool.rawValue + "|" + files.map(\.path).joined(separator: "|")
-        if let existing = windows.first(where: { $0.identifier?.rawValue == key }) {
-            bringForward(existing)
+        if let existing = editors.first(where: { $0.window.identifier?.rawValue == key }) {
+            bringForward(existing.window)
             return
         }
         let window = NSWindow(
@@ -53,8 +60,17 @@ final class EditorWindows: NSObject, NSWindowDelegate {
         } else {
             window.center()
         }
-        windows.append(window)
+        editors.append(HostedEditor(window: window, tool: tool, files: files))
         bringForward(window)
+    }
+
+    func applyLanguage() {
+        for editor in editors {
+            editor.window.title = editor.tool.windowTitle
+            editor.window.subtitle = editor.files.count == 1
+                ? editor.files[0].lastPathComponent
+                : L("\(editor.files.count) files", "\(editor.files.count) dosya")
+        }
     }
 
     /// Drops onto the nonactivating wheel come from another app, so activation alone may be refused.
@@ -66,7 +82,7 @@ final class EditorWindows: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        windows.removeAll { $0 === window }
+        editors.removeAll { $0.window === window }
     }
 }
 

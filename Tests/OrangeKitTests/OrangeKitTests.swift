@@ -352,6 +352,26 @@ final class WebPTests: XCTestCase {
     }
 }
 
+final class LanguageTests: XCTestCase {
+    func testChoiceOverridesTheSystemLanguage() {
+        let previous = Lang.choice
+        defer { Lang.choice = previous }
+
+        Lang.choice = .english
+        XCTAssertFalse(Lang.isTurkish)
+        XCTAssertEqual(Lang.t("Save", "Kaydet"), "Save")
+
+        Lang.choice = .turkish
+        XCTAssertTrue(Lang.isTurkish)
+        XCTAssertEqual(Lang.t("Save", "Kaydet"), "Kaydet")
+
+        Lang.choice = .system
+        let followsTurkish = Locale.preferredLanguages.first?.hasPrefix("tr") == true
+        XCTAssertEqual(Lang.isTurkish, followsTurkish)
+        XCTAssertEqual(Lang.t("Save", "Kaydet"), followsTurkish ? "Kaydet" : "Save")
+    }
+}
+
 final class CodeActionTests: XCTestCase {
     func testWebLinks() {
         XCTAssertEqual(CodeAction.parse("https://www.apple.com/tr/").destination, "apple.com")

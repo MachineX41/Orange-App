@@ -33,6 +33,13 @@ final class AppRuntime {
     var localWheel: WheelSession?
 
     var appearance: AppearanceChoice { didSet { save() } }
+    var language: LanguageChoice {
+        didSet {
+            Lang.choice = language
+            EditorWindows.shared.applyLanguage()
+            save()
+        }
+    }
     var revealWhenDone: Bool { didSet { save() } }
     var soundOnDone: Bool { didSet { save() } }
     var hapticOnWheel: Bool { didSet { save() } }
@@ -71,6 +78,9 @@ final class AppRuntime {
     private init() {
         let defaults = UserDefaults.standard
         appearance = AppearanceChoice(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
+        let language = LanguageChoice(rawValue: defaults.string(forKey: Lang.defaultsKey) ?? "") ?? .system
+        self.language = language
+        Lang.choice = language
         revealWhenDone = defaults.object(forKey: "revealWhenDone") as? Bool ?? false
         soundOnDone = defaults.object(forKey: "soundOnDone") as? Bool ?? true
         hapticOnWheel = defaults.object(forKey: "hapticOnWheel") as? Bool ?? true
@@ -95,6 +105,7 @@ final class AppRuntime {
     private func save() {
         guard !loading else { return }
         defaults.set(appearance.rawValue, forKey: "appearance")
+        defaults.set(language.rawValue, forKey: Lang.defaultsKey)
         defaults.set(revealWhenDone, forKey: "revealWhenDone")
         defaults.set(soundOnDone, forKey: "soundOnDone")
         defaults.set(hapticOnWheel, forKey: "hapticOnWheel")
