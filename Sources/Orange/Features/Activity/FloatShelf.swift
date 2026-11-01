@@ -2,12 +2,12 @@ import AppKit
 import OrangeKit
 import SwiftUI
 
-/// Always-on-top shelf for parking files while moving between apps. Same mesh, glass and type as the main panel.
+/// Always-on-top shelf for parking files while moving between apps. One liquid-glass vessel, like the drop container.
 @MainActor
 final class FloatShelf {
     static let shared = FloatShelf()
     fileprivate static let size = NSSize(width: 132, height: 460)
-    fileprivate static let radius: CGFloat = 28
+    fileprivate static let radius: CGFloat = 30
 
     private var panelStorage: NSPanel?
     /// Card and button frames, in the shelf’s top-left coordinates, that must keep their own click or file drag.
@@ -47,8 +47,7 @@ final class FloatShelf {
         )
         host.sizingOptions = []
         host.wantsLayer = true
-        host.layer?.cornerRadius = Self.radius
-        host.layer?.masksToBounds = true
+        host.layer?.isOpaque = false
         host.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentView = host
         if panel.setFrameAutosaveName("OrangeFloatingShelf") {
@@ -63,7 +62,7 @@ final class FloatShelf {
         return panel
     }
 
-    /// Glass and the mesh follow the app theme, including System when the Mac switches on its own.
+    /// Glass follows the app theme, including System when the Mac switches on its own.
     func applyAppearance() {
         guard let panelStorage else { return }
         apply(AppRuntime.shared.appearance, to: panelStorage)
@@ -95,26 +94,17 @@ struct FloatShelfView: View {
     @State var targeted = false
 
     var body: some View {
-        ZStack {
-            OrangeBackdrop()
-            VStack(spacing: 10) {
-                header
-                if runtime.shelf.isEmpty {
-                    empty
-                } else {
-                    files
-                }
-            }
-            .padding(10)
-            if targeted {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(OrangeTheme.accent, style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
-                    .padding(10)
-                    .allowsHitTesting(false)
+        VStack(spacing: 10) {
+            header
+            if runtime.shelf.isEmpty {
+                empty
+            } else {
+                files
             }
         }
+        .padding(10)
         .frame(width: FloatShelf.size.width, height: FloatShelf.size.height)
-        .clipShape(RoundedRectangle(cornerRadius: FloatShelf.radius, style: .continuous))
+        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: FloatShelf.radius, style: .continuous))
         .coordinateSpace(name: "shelf")
         .preferredColorScheme(runtime.appearance.colorScheme)
         .onPreferenceChange(ShelfInteractiveFrames.self) { FloatShelf.shared.interactiveFrames = $0 }
@@ -157,7 +147,6 @@ struct FloatShelfView: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .glassCard(radius: 18)
     }
 
     private var files: some View {
@@ -172,9 +161,8 @@ struct FloatShelfView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
-                        .padding(6)
+                        .padding(.vertical, 4)
                         .frame(maxWidth: .infinity)
-                        .glassCard(radius: 16)
                         .shelfInteractive()
                         .onDrag { NSItemProvider(contentsOf: file.url) ?? NSItemProvider() }
                         .contextMenu {
