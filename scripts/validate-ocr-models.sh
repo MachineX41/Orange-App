@@ -55,7 +55,7 @@ else
   filter="OCRDownloadedModelTests"
 fi
 
-xunit="$outdir/xunit-$([[ -n "$model" ]] && echo "$model" || echo all).xml"
+log="$outdir/swift-test-$([[ -n "$model" ]] && echo "$model" || echo all).log"
 export ORANGE_OCR_MODEL_TESTS=1
 export ORANGE_OCR_HELPER="$helper"
 
@@ -69,25 +69,24 @@ if [[ -n "$model" ]]; then
     deepseek-ocr-2) tests="testDeepSeekCPURecognition|testDeepSeekMetalCPUProjectorRecognition" ;;
     *) echo "Unknown model: $model" >&2; exit 2 ;;
   esac
-  swift test --filter "OCRDownloadedModelTests.($tests)" --xunit-output "$xunit" || true
+  swift test --filter "OCRDownloadedModelTests.($tests)" 2>&1 | tee "$log" || true
 else
-  swift test --filter "OCRDownloadedModelTests" --xunit-output "$xunit" || true
+  swift test --filter "OCRDownloadedModelTests" 2>&1 | tee "$log" || true
 fi
 
-python3 - "$xunit" "$outdir" <<'EOF'
-import sys, xml.etree.ElementTree as ET, json, pathlib
-xunit, outdir = sys.argv[1], pathlib.Path(sys.argv[2])
+# Parse XCTest result lines (Swift 6.4 --xunit-output no longer emits XCTest XML).
+python3 - "$log" "$outdir" <<'EOF'
+import sys, re, json, pathlib
+log, outdir = sys.argv[1], pathlib.Path(sys.argv[2])
 expected = ["testGLMCPURecognition","testGLMMetalRecognition","testPaddleCPURecognition","testPaddleMetalRecognition","testQwenCPURecognition","testQwenMetalRecognition","testDotsCPURecognition","testDotsMetalRecognition","testDeepSeekCPURecognition","testDeepSeekMetalCPUProjectorRecognition","testWarmPDFReusesGLM","testSwitchGLMToAppleReleasesHelper","testCancelGLMInference","testGLMMultiPageMemoryBound"]
-try:
-    tree = ET.parse(xunit)
-except Exception as e:
-    print(f"xunit parse failed: {e}"); sys.exit(1)
+text = open(log).read()
 found = {}
-for case in tree.getroot().iter("testcase"):
-    name = case.get("name", "")
-    skipped = case.find("skipped") is not None
-    failed = case.find("failure") is not None or case.find("error") is not None
-    found[name] = "SKIP" if skipped else ("FAIL" if failed else "PASS")
+for name in expected:
+    # "Test Case '-[... testName]' passed/failed/skipped"
+    m = re.findall(r"Test Case '-\[\S+ " + name + r"\]' (passed|failed|skipped)", text)
+    if m:
+        last = m[-1]
+        found[name] = "PASS" if last == "passed" else ("FAIL" if last == "failed" else "SKIP")
 missing = [n for n in expected if n not in found]
 report = {"expected": expected, "found": found, "missing": missing}
 (outdir / "matrix.json").write_text(json.dumps(report, indent=2))
