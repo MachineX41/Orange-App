@@ -358,7 +358,12 @@ struct OCRWorkspace: View {
     // MARK: - Options plumbing
 
     private var availableModels: [(id: OCRModelID, displayName: String)] {
-        OCRModelCatalog.all.map { ($0.id, $0.displayName) }
+        OCRModelCatalog.all.map { entry in
+            if entry.id == .appleVision {
+                return (entry.id, L("Apple (on-device, no VLM)", "Apple (cihaz içi, VLM yok)"))
+            }
+            return (entry.id, entry.displayName)
+        }
     }
 
     private var supportedModes: [OCRMode] {

@@ -126,7 +126,7 @@ std::string pinnedPrompt(const std::string& modelID, const std::string& mode) {
         // OCR triggers; the full Markdown instruction makes them stop early.
         // Keep the trigger short and let the chat template carry the task.
         if (modelID == "glm-ocr") return "Text Recognition: markdown, figures as ![Figure: caption].";
-        if (modelID == "paddleocr-vl-1.6") return "OCR markdown, figures as ![Figure: caption]:";
+        if (modelID == "paddleocr-vl-1.6") return "OCR: markdown, figures as ![Figure: caption].";
         if (modelID == "dots-ocr") return "Extract the text content from this image as markdown. Figures as ![Figure: caption].";
         if (modelID == "deepseek-ocr-2") return "Free OCR markdown, figures as ![Figure: caption].";
         return pinnedDocumentPrompt();
