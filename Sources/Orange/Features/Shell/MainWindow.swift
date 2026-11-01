@@ -10,32 +10,68 @@ struct MainWindow: View {
 
     @State private var host: NSWindow?
     @State private var frameBeforeTour: NSRect?
+    @State private var tourMounted: Bool
+    @State private var tourVisible: Bool
+    @State private var panelMounted: Bool
+    @State private var panelVisible: Bool
+    @State private var chromeReady: Bool
+    @State private var settled: Bool
+    @State private var transitioning = false
+    @State private var panelTarget: NSRect = .zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init() {
+        let touring = AppRuntime.shared.showOnboarding
+        _tourMounted = State(initialValue: touring)
+        _tourVisible = State(initialValue: touring)
+        _panelMounted = State(initialValue: !touring)
+        _panelVisible = State(initialValue: !touring)
+        _chromeReady = State(initialValue: !touring)
+        _settled = State(initialValue: !touring)
+    }
 
     var body: some View {
         @Bindable var runtime = runtime
-        Group {
-            if runtime.showOnboarding {
-                OnboardingView { runtime.finishOnboarding() }
-            } else {
+        ZStack {
+            OrangeBackdrop()
+            if panelMounted {
                 panel
+                    .opacity(panelVisible ? 1 : 0)
+                    .scaleEffect(panelVisible ? 1 : 0.972, anchor: .center)
+                    .allowsHitTesting(panelVisible)
+            }
+            if tourMounted {
+                OnboardingView { runtime.finishOnboarding() }
+                    .opacity(tourVisible ? 1 : 0)
+                    .scaleEffect(tourVisible ? 1 : 0.965, anchor: .center)
+                    .allowsHitTesting(tourVisible)
             }
         }
-        .frame(minWidth: runtime.showOnboarding ? 760 : 940, minHeight: runtime.showOnboarding ? 560 : 620)
-        .toolbar(runtime.showOnboarding ? .hidden : .visible, for: .windowToolbar)
+        .animation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.62, dampingFraction: 0.9), value: tourVisible)
+        .animation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.78, dampingFraction: 0.88), value: panelVisible)
+        .frame(
+            minWidth: panelVisible ? 940 : 760,
+            idealWidth: panelVisible ? 1200 : 760,
+            minHeight: panelVisible ? 640 : 560,
+            idealHeight: panelVisible ? 800 : 560
+        )
+        .animation(reduceMotion ? nil : .spring(response: 0.78, dampingFraction: 0.88), value: panelVisible)
+        .toolbar(chromeReady ? .visible : .hidden, for: .windowToolbar)
         .background(WindowReader { window in
             if host !== window { host = window }
         })
         .onAppear {
             runtime.openWindowAction = openWindow
             guard runtime.showOnboarding else { return }
-            fit(onboarding: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { fit(onboarding: true) }
+            fitTourWindow(animated: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { fitTourWindow(animated: false) }
         }
         .onChange(of: runtime.showOnboarding) { wasShowing, showing in
-            fit(onboarding: showing, restore: wasShowing)
+            if showing { presentTour() }
+            else if wasShowing { revealPanel() }
         }
         .onChange(of: host) { _, _ in
-            if runtime.showOnboarding { fit(onboarding: true) }
+            if runtime.showOnboarding { fitTourWindow(animated: false) }
         }
     }
 
@@ -114,28 +150,130 @@ struct MainWindow: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: runtime.localWheel)
     }
 
-    /// Onboarding uses the window by itself. Finishing it, or replaying the tour, resizes that same window.
-    private func fit(onboarding showing: Bool, restore: Bool = false) {
-        DispatchQueue.main.async {
-            guard let host else { return }
-            if showing {
-                if host.frame.width > 800 { frameBeforeTour = host.frame }
-                host.titleVisibility = .hidden
-                host.titlebarAppearsTransparent = true
-                host.setContentSize(NSSize(width: 760, height: 560))
-                host.center()
-            } else {
-                host.titleVisibility = .visible
-                host.titlebarAppearsTransparent = false
-                host.title = "Orange"
-                if restore, let frameBeforeTour, frameBeforeTour.width > 800 {
-                    host.setFrame(frameBeforeTour, display: true, animate: true)
-                } else if restore || host.frame.width < 900 {
-                    host.setContentSize(NSSize(width: 1200, height: 800))
-                    host.center()
-                }
-                frameBeforeTour = nil
+    /// Grows the tour window into the panel. The backdrop never changes, so the two views crossfade inside one motion.
+    private func revealPanel() {
+        panelMounted = true
+        guard !reduceMotion else {
+            tourVisible = false
+            tourMounted = false
+            panelVisible = true
+            showChrome()
+            resize(toPanel: false)
+            return
+        }
+        transitioning = true
+        host?.title = "Orange"
+        host?.titleVisibility = .visible
+        host?.titlebarAppearsTransparent = false
+        withAnimation(.easeIn(duration: 0.45)) { tourVisible = false }
+        withAnimation(.spring(response: 0.78, dampingFraction: 0.88)) { panelVisible = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+            withAnimation(.easeOut(duration: 0.3)) { chromeReady = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            settled = true
+            tourMounted = false
+            transitioning = false
+            if let host, host.frame.width < 1100 {
+                host.setFrame(frame(fittingContent: NSSize(width: 1200, height: 800), in: host), display: true, animate: true)
             }
+        }
+    }
+
+    /// Shrinks the panel back into the tour when it is replayed.
+    private func presentTour() {
+        tourMounted = true
+        guard !reduceMotion else {
+            panelVisible = false
+            panelMounted = false
+            tourVisible = true
+            chromeReady = false
+            settled = false
+            fitTourWindow(animated: false)
+            return
+        }
+        transitioning = true
+        chromeReady = false
+        settled = false
+        withAnimation(.easeIn(duration: 0.28)) { panelVisible = false }
+        fitTourWindow(animated: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.86)) { tourVisible = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            panelMounted = false
+            transitioning = false
+        }
+    }
+
+    private func showChrome() {
+        host?.title = "Orange"
+        host?.titleVisibility = .visible
+        host?.titlebarAppearsTransparent = false
+        chromeReady = true
+        settled = true
+    }
+
+    private func fitTourWindow(animated: Bool) {
+        guard let host, !transitioning || animated else { return }
+        if host.frame.width > 860 { frameBeforeTour = host.frame }
+        host.titleVisibility = .hidden
+        host.titlebarAppearsTransparent = true
+        let target = frame(fittingContent: NSSize(width: 760, height: 560), in: host)
+        guard abs(host.frame.width - target.width) > 12 || abs(host.frame.height - target.height) > 12 else { return }
+        if animated {
+            animate(host, to: target, duration: 0.55)
+        } else {
+            host.setFrame(target, display: true)
+        }
+    }
+
+    private func resize(toPanel animated: Bool) {
+        guard let host else { return }
+        let target: NSRect
+        if let frameBeforeTour, frameBeforeTour.width > 860 {
+            target = frameBeforeTour
+        } else {
+            target = frame(fittingContent: NSSize(width: 1200, height: 800), in: host)
+        }
+        frameBeforeTour = nil
+        panelTarget = target
+        if animated {
+            animate(host, to: target, duration: 0.7)
+        } else {
+            host.setFrame(target, display: true)
+        }
+    }
+
+    private func lockPanelFrame() {
+        guard let host, panelTarget.width > 860 else { return }
+        guard abs(host.frame.width - panelTarget.width) > 6 || abs(host.frame.height - panelTarget.height) > 6 else { return }
+        host.setFrame(panelTarget, display: true)
+    }
+
+    private func frame(fittingContent size: NSSize, in window: NSWindow) -> NSRect {
+        let current = window.contentRect(forFrameRect: window.frame)
+        let content = NSRect(
+            x: current.midX - size.width / 2,
+            y: current.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        var frame = window.frameRect(forContentRect: content)
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            frame.size.width = min(frame.width, visible.width)
+            frame.size.height = min(frame.height, visible.height)
+            frame.origin.x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+            frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+        }
+        return frame
+    }
+
+    private func animate(_ window: NSWindow, to frame: NSRect, duration: Double) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 0.84, 0.22, 1)
+            window.animator().setFrame(frame, display: true)
         }
     }
 
