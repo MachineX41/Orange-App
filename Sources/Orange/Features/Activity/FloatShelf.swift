@@ -359,6 +359,7 @@ struct FloatShelfView: View {
                     .buttonStyle(.glass).tint(nil)
                     .buttonBorderShape(.circle)
                     .controlSize(.mini)
+                    .help(L("Clear", "Temizle"))
                     .shelfInteractive()
                 }
             }
@@ -400,6 +401,22 @@ struct FloatShelfView: View {
             .shelfInteractive()
     }
 
+    private func removeButton(_ file: FileRef) -> some View {
+        Button {
+            runtime.removeFromShelf(file)
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 7, weight: .bold))
+                .frame(width: 14, height: 14)
+        }
+        .buttonStyle(.glass).tint(nil)
+        .buttonBorderShape(.circle)
+        .controlSize(.mini)
+        .padding(3)
+        .help(L("Remove", "Kaldır"))
+        .shelfInteractive()
+    }
+
     private var empty: some View {
         VStack(spacing: 6) {
             Image(systemName: "arrow.down.doc")
@@ -428,8 +445,12 @@ struct FloatShelfView: View {
 
     private func fileStack(_ axis: Axis) -> some View {
         let stack = ForEach(runtime.shelf) { file in
+            let side: CGFloat = axis == .vertical ? 72 : 52
             VStack(spacing: 4) {
-                FileThumbnail(url: file.url, side: axis == .vertical ? 72 : 52, radius: 12)
+                FileThumbnail(url: file.url, side: side, radius: 12)
+                    .overlay(alignment: .topTrailing) {
+                        removeButton(file)
+                    }
                 Text(file.name)
                     .font(.system(size: 10))
                     .lineLimit(1)

@@ -123,6 +123,20 @@ struct ShelfView: View {
                         ForEach(runtime.shelf) { file in
                             VStack(spacing: 6) {
                                 FileThumbnail(url: file.url, side: 96, radius: 14)
+                                    .overlay(alignment: .topTrailing) {
+                                        Button {
+                                            runtime.removeFromShelf(file)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .frame(width: 16, height: 16)
+                                        }
+                                        .buttonStyle(.glass).tint(nil)
+                                        .buttonBorderShape(.circle)
+                                        .controlSize(.mini)
+                                        .padding(4)
+                                        .help(L("Remove", "Kaldır"))
+                                    }
                                 Text(file.name).font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
                             }
                             .padding(10)
