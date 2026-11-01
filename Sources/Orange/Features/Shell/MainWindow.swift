@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Shared by the welcome tour and the first working window, so one opens into the other.
 enum StudioWindow {
-    static let width: CGFloat = 960
-    static let height: CGFloat = 680
+    static let width: CGFloat = 920
+    static let height: CGFloat = 650
 }
 
 struct MainWindow: View {
@@ -77,7 +77,7 @@ struct MainWindow: View {
                 fitTourWindow(animated: false)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { fitTourWindow(animated: false) }
             } else {
-                growToDefaultIfSmaller()
+                fitOpeningSize()
             }
         }
         .onChange(of: runtime.showOnboarding) { wasShowing, showing in
@@ -86,7 +86,7 @@ struct MainWindow: View {
         }
         .onChange(of: host) { _, _ in
             if runtime.showOnboarding { fitTourWindow(animated: false) }
-            else { growToDefaultIfSmaller() }
+            else { fitOpeningSize() }
         }
     }
 
@@ -259,11 +259,13 @@ struct MainWindow: View {
         }
     }
 
-    /// The previous default, 760×560, is below the new opening size. A window still sitting there grows once.
-    private func growToDefaultIfSmaller() {
+    /// Moves a window that is still on an earlier opening size to the current one.
+    private func fitOpeningSize() {
         guard let host else { return }
         let content = host.contentRect(forFrameRect: host.frame).size
-        guard content.width < 820, content.height < 620 else { return }
+        let earlier = (content.width < 820 && content.height < 620)
+            || (abs(content.width - 960) < 24 && abs(content.height - 680) < 24)
+        guard earlier else { return }
         let target = frame(fittingContent: NSSize(width: StudioWindow.width, height: StudioWindow.height), in: host)
         host.setFrame(target, display: true)
     }
