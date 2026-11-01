@@ -83,26 +83,6 @@ public enum OCRModelCatalog {
             scoreNote: "94.62 OmniDocBench v1.5 (upstream pipeline, not this build)"
         ),
         OCRModelEntry(
-            id: .paddleOCRVL16,
-            displayName: "PaddleOCR-VL 1.6",
-            sourceRepo: "PaddlePaddle/PaddleOCR-VL-1.6-GGUF",
-            revision: "511b09642bb324401f15f97cc23bc67e8f0a291d",
-            artifacts: [
-                OCRModelArtifact(role: "model", filename: "PaddleOCR-VL-1.6-GGUF.gguf", byteCount: 935_769_056, sha256: "f3ae46ec885050acf4b3d31944431e1fd90d50664fb09126af4a3c050ba14ee8"),
-                OCRModelArtifact(role: "projector", filename: "PaddleOCR-VL-1.6-GGUF-mmproj.gguf", byteCount: 881_770_560, sha256: "204d757d7610d9b3faab10d506d69e5b244e32bf765e2bab2d0167e65e0a058a"),
-            ],
-            license: "Apache-2.0",
-            licenseURL: "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF",
-            sourceURL: "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF",
-            modes: [.text, .document],
-            languageClaim: "Yerel ölçüm yapılmadı",
-            provenance: "producer",
-            estimatedWorkingSetBytes: 4_000_000_000,
-            projectorCPUOnly: false,
-            cpuUnsupportedReason: "Vision encoder hangs on CPU backend (upstream llama.cpp); Metal required.",
-            scoreNote: "96.33 OmniDocBench v1.6 (upstream pipeline, not this build)"
-        ),
-        OCRModelEntry(
             id: .qwen3VL2B,
             displayName: "Qwen3-VL 2B",
             sourceRepo: "Qwen/Qwen3-VL-2B-Instruct-GGUF",
@@ -121,46 +101,6 @@ public enum OCRModelCatalog {
             projectorCPUOnly: false,
             cpuUnsupportedReason: nil,
             scoreNote: nil
-        ),
-        OCRModelEntry(
-            id: .dotsOCR,
-            displayName: "dots.ocr",
-            sourceRepo: "ggml-org/dots.ocr-GGUF",
-            revision: "2c093a32ca360a396bc6d87d60408636130b9d9b",
-            artifacts: [
-                OCRModelArtifact(role: "model", filename: "dots.ocr-Q8_0.gguf", byteCount: 1_894_530_272, sha256: "6f2db1a75215893760b7c7185d52f11715d2e0cb7bff9cefd3f6d409fa1de7e9"),
-                OCRModelArtifact(role: "projector", filename: "mmproj-dots.ocr-Q8_0.gguf", byteCount: 1_344_068_512, sha256: "20d3d35bea3a64ead0b4b213f8db0de136e174bb5b75b8e85786c51e8e822423"),
-            ],
-            license: "MIT",
-            licenseURL: "https://github.com/rednote-hilab/dots.ocr/blob/master/LICENSE",
-            sourceURL: "https://huggingface.co/ggml-org/dots.ocr-GGUF",
-            modes: [.text, .document],
-            languageClaim: "Yerel ölçüm yapılmadı",
-            provenance: "ggml-conversion",
-            estimatedWorkingSetBytes: 6_000_000_000,
-            projectorCPUOnly: false,
-            cpuUnsupportedReason: nil,
-            scoreNote: nil
-        ),
-        OCRModelEntry(
-            id: .deepseekOCR2,
-            displayName: "DeepSeek-OCR 2",
-            sourceRepo: "42ailab/DeepSeek-OCR-2-GGUF",
-            revision: "2b2f86a4bd33f98580605a47d3c55533eb551422",
-            artifacts: [
-                OCRModelArtifact(role: "model", filename: "deepseek-ocr-2-Q4_K_M.gguf", byteCount: 1_950_320_688, sha256: "2b5625a1d649670fa4300a1ca139869850a86e9f3ad5b8e389e2133a210b139d"),
-                OCRModelArtifact(role: "projector", filename: "mmproj-deepseek-ocr-2-q8_0.gguf", byteCount: 512_537_792, sha256: "46efe1304f581869f3b067eb77b1151dc0daf32bc25ef644fc7d505f4153a545"),
-            ],
-            license: "Apache-2.0",
-            licenseURL: "https://huggingface.co/deepseek-ai/DeepSeek-OCR-2",
-            sourceURL: "https://huggingface.co/42ailab/DeepSeek-OCR-2-GGUF",
-            modes: [.text, .document],
-            languageClaim: "Türkçe: yerel ölçüm yapılmadı",
-            provenance: "community",
-            estimatedWorkingSetBytes: 5_000_000_000,
-            projectorCPUOnly: true,
-            cpuUnsupportedReason: nil,
-            scoreNote: "Community mirror; hybrid precision note applies"
         ),
     ]
 

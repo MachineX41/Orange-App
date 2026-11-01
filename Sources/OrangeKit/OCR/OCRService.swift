@@ -87,7 +87,7 @@ public actor OCRService {
         case .image(let image):
             // Region pipeline: VLM + document mode splits the page via Apple
             // layout, asks the VLM per text region, crops figures to files.
-            // Never asks the VLM about pixels (Marker/MinerU/dots.ocr recipe).
+            // Never asks the VLM about pixels (Marker/MinerU recipe).
             if options.modelID != .appleVision, options.mode == .document,
                let native = nativeEngine {
                 let content = try await recognizeRegions(

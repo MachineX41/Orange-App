@@ -123,19 +123,13 @@ std::string pinnedDocumentPrompt() {
 std::string pinnedPrompt(const std::string& modelID, const std::string& mode) {
     bool document = (mode == "document");
     if (document) {
-        // Short-prompt models (GLM/Paddle/dots/DeepSeek) were trained on terse
+        // Short-prompt models were trained on terse
         // OCR triggers; the full Markdown instruction makes them stop early.
         // Keep the trigger short and let the chat template carry the task.
         if (modelID == "glm-ocr") return "Text Recognition: markdown. Figures as bracket placeholders, no URLs.";
-        if (modelID == "paddleocr-vl-1.6") return "OCR: markdown. Figures as bracket placeholders, no URLs.";
-        if (modelID == "dots-ocr") return "Extract the text content from this image as markdown. Figures as bracket placeholders, no URLs.";
-        if (modelID == "deepseek-ocr-2") return "Free OCR markdown. Figures as bracket placeholders, no URLs.";
         return pinnedDocumentPrompt();
     }
     if (modelID == "glm-ocr") return "Text Recognition:";
-    if (modelID == "paddleocr-vl-1.6") return "OCR:";
-    if (modelID == "dots-ocr") return "Extract the text content from this image.";
-    if (modelID == "deepseek-ocr-2") return "Free OCR.";
     return "Transcribe all visible text exactly. Preserve reading order and line breaks.";
 }
 
@@ -214,17 +208,9 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
 
     bool wantMetal = (compute == "metal" || compute == "automatic");
     bool cpuOnly = (compute == "cpu") || !wantMetal;
-    bool projectorCPU = (modelID == "deepseek-ocr-2");
     int layers = cpuOnly ? 0 : 999;
 
     params.n_gpu_layers = layers;
-    // Projector backend: with split modeling the mmproj runs on the same
-    // device grid; DeepSeek-2's projector is forced to CPU per publisher note
-    // by keeping the text model CPU-resident for the vision path while the LM
-    // still uses Metal through the shared backend scheduler.
-    if (projectorCPU && wantMetal) {
-        params.n_gpu_layers = layers;  // LM on Metal, vision embeddings decoded on CPU path
-    }
 
     ggml_backend_load_all();
     common_init_result_ptr init = common_init_from_params(params);
@@ -243,9 +229,6 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     // breaks Qwen-VL (needs >=1024 min); resolution is already capped Swift-side
     // (balanced 2048 / high 3072 long edge) before the image reaches us.
     (void)quality;
-    if (projectorCPU) {
-        visionParams.use_gpu = false;  // vision encoder on CPU even when LM uses Metal
-    }
     mtmd::context_ptr vision(mtmd_init_from_file(projectorPath.c_str(), model, visionParams));
     if (!vision) {
         emitError(requestID, wantMetal ? "metalInitialization" : "modelLoad",
@@ -264,7 +247,7 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     loaded.templates = common_chat_templates_init(model, "");
     loaded.modelID = modelID;
     loaded.nBatch = params.n_batch;
-    loaded.projectorCPUOnly = projectorCPU;
+    loaded.projectorCPUOnly = false;
     loaded.cpuOnly = cpuOnly;
     loaded.maxOutput = maxOutput;
     loaded.nPast = 0;

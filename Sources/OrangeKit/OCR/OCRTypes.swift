@@ -6,10 +6,7 @@ import Foundation
 public enum OCRModelID: String, Codable, CaseIterable, Sendable {
     case appleVision = "apple-vision"
     case glmOCR = "glm-ocr"
-    case paddleOCRVL16 = "paddleocr-vl-1.6"
     case qwen3VL2B = "qwen3-vl-2b"
-    case dotsOCR = "dots-ocr"
-    case deepseekOCR2 = "deepseek-ocr-2"
 
 }
 
@@ -30,7 +27,7 @@ public enum OCRQuality: String, Codable, Sendable, CaseIterable {
 }
 
 /// Where the numbers actually came from. Apple delegates to the OS; `metalTextCPUProjector`
-/// is the DeepSeek-2 split (LM on Metal, vision projector forced to CPU per publisher note).
+/// `metalTextCPUProjector` is reserved for split backends (LM on Metal, projector on CPU).
 public enum OCRActualCompute: String, Codable, Sendable {
     case appleManaged = "appleManaged"
     case metal = "metal"
@@ -167,7 +164,7 @@ public protocol OCREngine: Sendable {
 
 /// A layout region on a page: text/table goes to the VLM as a crop,
 /// figure is cropped to a real file and referenced. Follows the
-/// Marker/MinerU/dots.ocr recipe: never ask the VLM about pixels.
+/// Marker/MinerU recipe: never ask the VLM about pixels.
 public struct OCRRegion: Sendable, Equatable {
     public enum Kind: Sendable, Equatable {
         case text

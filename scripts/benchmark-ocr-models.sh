@@ -13,29 +13,20 @@ mkdir -p "$OUT"
 
 models=("$@")
 if [[ ${#models[@]} -eq 0 ]]; then
-  models=(glm-ocr paddleocr-vl-1.6 qwen3-vl-2b dots-ocr deepseek-ocr-2)
+  models=(glm-ocr qwen3-vl-2b)
 fi
 
 declare -A REVS=(
   [glm-ocr]="65a42de1148dbed2297e922b5dbc7d9b70c36578"
-  [paddleocr-vl-1.6]="511b09642bb324401f15f97cc23bc67e8f0a291d"
   [qwen3-vl-2b]="52d6c8ffea26cc873ac5ad116f8631268d7eb503"
-  [dots-ocr]="2c093a32ca360a396bc6d87d60408636130b9d9b"
-  [deepseek-ocr-2]="2b2f86a4bd33f98580605a47d3c55533eb551422"
 )
 declare -A MODEL_FILE=(
   [glm-ocr]="GLM-OCR-Q8_0.gguf"
-  [paddleocr-vl-1.6]="PaddleOCR-VL-1.6-GGUF.gguf"
   [qwen3-vl-2b]="Qwen3VL-2B-Instruct-Q4_K_M.gguf"
-  [dots-ocr]="dots.ocr-Q8_0.gguf"
-  [deepseek-ocr-2]="deepseek-ocr-2-Q4_K_M.gguf"
 )
 declare -A PROJ_FILE=(
   [glm-ocr]="mmproj-GLM-OCR-Q8_0.gguf"
-  [paddleocr-vl-1.6]="PaddleOCR-VL-1.6-GGUF-mmproj.gguf"
   [qwen3-vl-2b]="mmproj-Qwen3VL-2B-Instruct-F16.gguf"
-  [dots-ocr]="mmproj-dots.ocr-Q8_0.gguf"
-  [deepseek-ocr-2]="mmproj-deepseek-ocr-2-q8_0.gguf"
 )
 
 for model in "${models[@]}"; do

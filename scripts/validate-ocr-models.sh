@@ -63,10 +63,7 @@ export ORANGE_OCR_HELPER="$helper"
 if [[ -n "$model" ]]; then
   case "$model" in
     glm-ocr) tests="testGLMCPURecognition|testGLMMetalRecognition|testWarmPDFReusesGLM|testSwitchGLMToAppleReleasesHelper|testCancelGLMInference|testGLMMultiPageMemoryBound" ;;
-    paddleocr-vl-1.6) tests="testPaddleCPURecognition|testPaddleMetalRecognition" ;;
     qwen3-vl-2b) tests="testQwenCPURecognition|testQwenMetalRecognition" ;;
-    dots-ocr) tests="testDotsCPURecognition|testDotsMetalRecognition" ;;
-    deepseek-ocr-2) tests="testDeepSeekCPURecognition|testDeepSeekMetalCPUProjectorRecognition" ;;
     *) echo "Unknown model: $model" >&2; exit 2 ;;
   esac
   swift test --filter "OCRDownloadedModelTests.($tests)" 2>&1 | tee "$log" || true
@@ -78,7 +75,7 @@ fi
 python3 - "$log" "$outdir" <<'EOF'
 import sys, re, json, pathlib
 log, outdir = sys.argv[1], pathlib.Path(sys.argv[2])
-expected = ["testGLMCPURecognition","testGLMMetalRecognition","testPaddleCPURecognition","testPaddleMetalRecognition","testQwenCPURecognition","testQwenMetalRecognition","testDotsCPURecognition","testDotsMetalRecognition","testDeepSeekCPURecognition","testDeepSeekMetalCPUProjectorRecognition","testWarmPDFReusesGLM","testSwitchGLMToAppleReleasesHelper","testCancelGLMInference","testGLMMultiPageMemoryBound"]
+expected = ["testGLMCPURecognition","testGLMMetalRecognition","testQwenCPURecognition","testQwenMetalRecognition","testWarmPDFReusesGLM","testSwitchGLMToAppleReleasesHelper","testCancelGLMInference","testGLMMultiPageMemoryBound"]
 text = open(log).read()
 found = {}
 for name in expected:
@@ -92,7 +89,7 @@ report = {"expected": expected, "found": found, "missing": missing}
 (outdir / "matrix.json").write_text(json.dumps(report, indent=2))
 # Paddle CPU is a documented unsupported config (vision encoder hangs on CPU
 # backend, upstream llama.cpp); its SKIP is accepted, not pending.
-accepted_skips = {"testPaddleCPURecognition"}
+accepted_skips = set()
 fails = [n for n, s in found.items() if s == "FAIL"] + missing
 if fails:
     print("MATRIX INCOMPLETE:", ", ".join(fails))

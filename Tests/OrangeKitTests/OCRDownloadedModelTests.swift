@@ -60,14 +60,8 @@ final class OCRDownloadedModelTests: XCTestCase {
 
     func testGLMCPURecognition() async throws { try await self.runCase(id: .glmOCR, compute: .cpu) }
     func testGLMMetalRecognition() async throws { try await self.runCase(id: .glmOCR, compute: .metal) }
-    func testPaddleCPURecognition() async throws { try await self.runCase(id: .paddleOCRVL16, compute: .cpu) }
-    func testPaddleMetalRecognition() async throws { try await self.runCase(id: .paddleOCRVL16, compute: .metal) }
     func testQwenCPURecognition() async throws { try await self.runCase(id: .qwen3VL2B, compute: .cpu, document: true) }
     func testQwenMetalRecognition() async throws { try await self.runCase(id: .qwen3VL2B, compute: .metal, document: true) }
-    func testDotsCPURecognition() async throws { try await self.runCase(id: .dotsOCR, compute: .cpu) }
-    func testDotsMetalRecognition() async throws { try await self.runCase(id: .dotsOCR, compute: .metal) }
-    func testDeepSeekCPURecognition() async throws { try await self.runCase(id: .deepseekOCR2, compute: .cpu) }
-    func testDeepSeekMetalCPUProjectorRecognition() async throws { try await self.runCase(id: .deepseekOCR2, compute: .metal) }
 
     func testWarmPDFReusesGLM() async throws {
         guard let entry = OCRModelCatalog.entry(for: .glmOCR) else { XCTFail("missing catalog"); return }

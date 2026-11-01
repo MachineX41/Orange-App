@@ -118,14 +118,8 @@ struct OCRModelsView: View {
             return nil
         case .glmOCR:
             return L("~2.2 GB RAM · ~23s/page · compact output", "~2,2 GB RAM · ~23sn/sayfa · özlü çıktı")
-        case .paddleOCRVL16:
-            return L("~2.2 GB RAM · ~9s/page · fastest, Metal only", "~2,2 GB RAM · ~9sn/sayfa · en hızlı, yalnız Metal")
         case .qwen3VL2B:
             return L("~3.8 GB RAM · ~36s/page · most complete", "~3,8 GB RAM · ~36sn/sayfa · en eksiksiz")
-        case .dotsOCR:
-            return L("~3.8 GB RAM · ~91s/page · slowest", "~3,8 GB RAM · ~91sn/sayfa · en yavaş")
-        case .deepseekOCR2:
-            return L("~4.4 GB RAM · ~21s/page · heaviest", "~4,4 GB RAM · ~21sn/sayfa · en ağır")
         }
     }
 

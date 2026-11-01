@@ -3,9 +3,7 @@ import Foundation
 
 /// VLM-backed engine that talks to the warm `OrangeOCRHelper` subprocess over
 /// NDJSON IPC. Apple models never reach this path. Long-edge caps: 2048
-/// balanced / 3072 high; small images are never upscaled. DeepSeek-2 always
-/// keeps the projector on CPU (publisher Metal-precision note) — the UI
-/// reports that split as `metalTextCPUProjector`, never plain `metal`.
+/// balanced / 3072 high; small images are never upscaled.
 ///
 /// Thread budget: `hw.perflevel0.physicalcpu` when present, else
 /// `max(1, activeProcessorCount - 2)`, clamped to [1, 8].
