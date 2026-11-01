@@ -60,11 +60,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Wires the warm native helper into OCRService once at launch.
     /// No model loads here — first inference with a VLM triggers load.
+    private var ocrReapTimer: Timer?
+    private var memorySource: DispatchSourceMemoryPressure?
+
     private func configureNativeOCR() {
         let helper = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Helpers/OrangeOCRHelper")
         guard FileManager.default.isExecutableFile(atPath: helper.path) else { return }
         Task { await OCRService.shared.configureNative(engine: NativeOCREngine(helperURL: helper)) }
+        // 8GB Macs: release the warm helper (1.5-3GB) after 60s idle.
+        ocrReapTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { await OCRService.shared.reapNativeIfIdle(timeout: 60) }
+        }
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        source.setEventHandler {
+            Task { await OCRService.shared.handleMemoryPressure() }
+        }
+        source.activate()
+        memorySource = source
     }
 
     /// The system Settings item's key changes with the macOS language (⌘Ö in Turkish), so it is read rather than assumed.

@@ -54,6 +54,9 @@ public actor NativeOCREngine: OCREngine {
         guard await store.status(for: entry) == .installed else {
             throw OrangeError.unreadable(entry.displayName)
         }
+        if options.compute == .cpu, let reason = entry.cpuUnsupportedReason {
+            throw OrangeError.unsupported(reason)
+        }
         try Task.checkCancellation()
         let started = ContinuousClock.now
         let staged = try await stageImage(image, quality: options.quality)
@@ -148,6 +151,7 @@ public actor NativeOCREngine: OCREngine {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
         try process.run()
+        self.process = process
         self.stdin = stdinPipe.fileHandleForWriting
         self.terminated = false
         let stdout = stdoutPipe.fileHandleForReading
@@ -170,28 +174,41 @@ public actor NativeOCREngine: OCREngine {
     }
 
     private func stopHelper() {
-        guard let process, process.isRunning else {
+        guard let process else {
             self.process = nil
             self.stdin = nil
             loadedKey = nil
             return
         }
+        // Close stdin first: helper exits cleanly on EOF. Don't trust
+        // Process.isRunning (stale KVO); verify via kill(pid, 0) instead.
+        try? stdin?.close()
+        self.stdin = nil
+        let pid = process.processIdentifier
         let captured = process
-        Task.detached {
+        // Synchronous escalation: EOF already sent via stdin close.
+        var alive = true
+        for _ in 0..<20 {
+            if kill(pid, 0) != 0 { alive = false; break }
+            usleep(100_000)
+        }
+        if alive {
             captured.terminate()
             for _ in 0..<20 {
-                if !captured.isRunning { return }
-                try? await Task.sleep(for: .milliseconds(100))
-            }
-            if captured.isRunning {
-                captured.interrupt()
-                // SIGKILL fallback when terminate is ignored (stuck Metal graph).
-                kill(captured.processIdentifier, SIGKILL)
+                if kill(pid, 0) != 0 { alive = false; break }
+                usleep(100_000)
             }
         }
+        if alive {
+            kill(pid, SIGKILL)
+        }
         self.process = nil
-        self.stdin = nil
         loadedKey = nil
+        // Wake every waiter: otherwise recognize() hangs forever on shutdown.
+        for (_, continuation) in pending {
+            continuation.resume(throwing: CancellationError())
+        }
+        pending.removeAll()
     }
 
     private func handleTermination() {

@@ -134,8 +134,12 @@ final class OCRRunner {
     }
 
     func exportAllMarkdown() throws -> URL {
-        let markdown = model.pages.map {
+        let bodies = model.pages.map {
             $0.editedMarkdown.isEmpty ? ($0.markdown ?? $0.text) : $0.editedMarkdown
+        }
+        let stripped = OCRPostprocess.stripRunningHeaders(bodies)
+        let markdown = stripped.enumerated().map { index, body in
+            "<!-- page \(index + 1) -->\n\n\(body)"
         }.joined(separator: "\n\n---\n\n")
         let base = model.sources.first?.url ?? URL(fileURLWithPath: "OCR.md")
         return try write(text: markdown, extension: "md", source: base)

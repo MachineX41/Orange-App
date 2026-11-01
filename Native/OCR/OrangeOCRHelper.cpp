@@ -108,21 +108,30 @@ long long fieldInt(const std::string& line, const char* key, long long fallback)
     }
 }
 
+std::string pinnedDocumentPrompt() {
+    // Xiaomi-OCR-0 style: structured Markdown, HTML tables, LaTeX formulas, reading order.
+    return "Extract all information from the document image and represent it in markdown format. "
+           "Tables should be expressed as HTML tables, formulas should be represented using LATEX format, "
+           "and the parsing should be organized according to the reading order. "
+           "Preserve all visible text, headings and lists. Do not translate, summarize, or invent content.";
+}
+
 std::string pinnedPrompt(const std::string& modelID, const std::string& mode) {
     bool document = (mode == "document");
+    if (document) {
+        // Short-prompt models (GLM/Paddle/dots/DeepSeek) were trained on terse
+        // OCR triggers; the full Markdown instruction makes them stop early.
+        // Keep the trigger short and let the chat template carry the task.
+        if (modelID == "glm-ocr") return "Text Recognition: markdown";
+        if (modelID == "paddleocr-vl-1.6") return "OCR markdown:";
+        if (modelID == "dots-ocr") return "Extract the text content from this image as markdown.";
+        if (modelID == "deepseek-ocr-2") return "Free OCR markdown.";
+        return pinnedDocumentPrompt();
+    }
     if (modelID == "glm-ocr") return "Text Recognition:";
     if (modelID == "paddleocr-vl-1.6") return "OCR:";
     if (modelID == "dots-ocr") return "Extract the text content from this image.";
     if (modelID == "deepseek-ocr-2") return "Free OCR.";
-    if (modelID == "qwen3-vl-2b") {
-        if (document) {
-            return "Transcribe this document as Markdown. Preserve all visible text, reading order, headings, lists, tables and formulas. Do not translate, summarize, or invent content.";
-        }
-        return "Transcribe all visible text exactly. Preserve reading order and line breaks.";
-    }
-    if (document) {
-        return "Transcribe this document as Markdown. Preserve all visible text, reading order, headings, lists, tables and formulas. Do not translate, summarize, or invent content.";
-    }
     return "Transcribe all visible text exactly. Preserve reading order and line breaks.";
 }
 
@@ -158,6 +167,7 @@ struct LoadedModel {
     common_chat_templates_ptr templates;
     std::string modelID;
     int nBatch = 512;
+    int maxOutput = 4096;
     bool projectorCPUOnly = false;
     bool cpuOnly = true;
     llama_pos nPast = 0;
@@ -172,8 +182,9 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     std::string quality = field(line, "quality");
     int contextTokens = (int)fieldInt(line, "contextTokens", 8192);
     int maxOutput = (int)fieldInt(line, "maxOutputTokens", 4096);
+    if (maxOutput <= 0) maxOutput = 4096;
+    if (maxOutput > 16384) maxOutput = 16384;
     int threads = (int)fieldInt(line, "threads", 4);
-    (void)maxOutput;
 
     common_params params;
     params.model.path = modelPath;
@@ -187,10 +198,15 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     params.cpuparams.n_threads = std::max(1, std::min(threads, 8));
     params.cpuparams_batch.n_threads = params.cpuparams.n_threads;
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-    params.sampling.temp = 0.0;  // greedy (Xiaomi recipe: temp 0 + top_p 0.8 filter)
+    params.sampling.temp = 0.0;  // pure greedy
     params.sampling.top_k = 1;
-    params.sampling.top_p = 0.8;
+    params.sampling.top_p = 1.0;
     params.sampling.penalty_repeat = 1.0;
+    // Xiaomi recipe: presence/freq guard against footnote/URL loops
+    // (p3: "NR = no demographic..." x50 with 0.1). 0.5 breaks loops
+    // without hurting greedy accuracy on clean pages.
+    params.sampling.penalty_present = 0.5;
+    params.sampling.penalty_freq = 0.5;
 
     bool wantMetal = (compute == "metal" || compute == "automatic");
     bool cpuOnly = (compute == "cpu") || !wantMetal;
@@ -219,11 +235,10 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     visionParams.use_gpu = wantMetal;
     visionParams.n_threads = params.cpuparams.n_threads;
     visionParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-    // Dynamic-resolution guardrails: bounded image tokens, never forced on
-    // fixed encoders. Balanced 2048 / high 4096 mirror the Swift-side caps.
-    bool high = (quality == "high");
-    visionParams.image_max_tokens = high ? 4096 : 2048;
-    visionParams.image_min_tokens = 0;
+    // Leave image token bounds at metadata defaults (-1). Overriding min to 0
+    // breaks Qwen-VL (needs >=1024 min); resolution is already capped Swift-side
+    // (balanced 2048 / high 3072 long edge) before the image reaches us.
+    (void)quality;
     if (projectorCPU) {
         visionParams.use_gpu = false;  // vision encoder on CPU even when LM uses Metal
     }
@@ -247,6 +262,7 @@ int doLoad(LoadedModel& loaded, const std::string& line) {
     loaded.nBatch = params.n_batch;
     loaded.projectorCPUOnly = projectorCPU;
     loaded.cpuOnly = cpuOnly;
+    loaded.maxOutput = maxOutput;
     loaded.nPast = 0;
 
     std::ostringstream out;
@@ -286,9 +302,13 @@ int doRecognize(LoadedModel& loaded, const std::string& line) {
 
     common_chat_msg user;
     user.role = "user";
-    user.content = prompt + marker;
-    std::string formatted = common_chat_format_single(
-        loaded.templates.get(), {}, user, true, false);
+    user.content = marker + prompt;
+    std::string formatted;
+    try {
+        formatted = common_chat_format_single(loaded.templates.get(), {}, user, true, true);
+    } catch (...) {
+        formatted = common_chat_format_single(loaded.templates.get(), {}, user, true, false);
+    }
 
     std::vector<std::string> segments = splitMarker(formatted, marker);
     const mtmd_bitmap* raw = bitmap.get();
@@ -362,19 +382,16 @@ int doRecognize(LoadedModel& loaded, const std::string& line) {
         }
     }
 
-    std::string generated;
+    llama_tokens generatedTokens;
     std::string markdown;
     int inputTokens = (int)loaded.nPast;
-    int outputTokens = 0;
     bool truncated = false;
-    const int maxTokens = 4096;
+    const int maxTokens = loaded.maxOutput;
     for (int i = 0; i < maxTokens; i++) {
         llama_token token = common_sampler_sample(loaded.sampler, loaded.lctx, -1);
         common_sampler_accept(loaded.sampler, token, true);
         if (llama_vocab_is_eog(loaded.vocab, token)) break;
-        std::string piece = common_detokenize(loaded.lctx, {token}, true);
-        generated += piece;
-        outputTokens++;
+        generatedTokens.push_back(token);
         if (i == maxTokens - 1) truncated = true;
         // Greedy single-pass decode of the sampled token.
         common_batch batch(loaded.lctx);
@@ -384,6 +401,9 @@ int doRecognize(LoadedModel& loaded, const std::string& line) {
             return 1;
         }
     }
+    // Detokenize once at the end: per-token calls break BPE merges ("computa"+"tionally").
+    std::string generated = common_detokenize(loaded.lctx, generatedTokens);
+    int outputTokens = (int)generatedTokens.size();
     if (mode == "document") markdown = generated;
 
     auto elapsed = std::chrono::steady_clock::now() - started;

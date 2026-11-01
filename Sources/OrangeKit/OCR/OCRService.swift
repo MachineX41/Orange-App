@@ -30,6 +30,20 @@ public actor OCRService {
         nativeEngine = engine
     }
 
+    /// Idle reaper hook: drops the warm helper after `timeout` of disuse.
+    /// Called from AppDelegate's timer and memory-pressure handler.
+    public func reapNativeIfIdle(timeout: TimeInterval = 60) async {
+        if let native = nativeEngine as? NativeOCREngine {
+            await native.reapIfIdle(timeout: timeout)
+        }
+    }
+
+    public func handleMemoryPressure() async {
+        if let native = nativeEngine as? NativeOCREngine {
+            await native.handleMemoryPressure()
+        }
+    }
+
     public func recognize(
         url: URL,
         options: OCROptions,

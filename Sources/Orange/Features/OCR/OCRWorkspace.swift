@@ -82,6 +82,7 @@ struct OCRWorkspace: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel(title: L("Mode", "Mod"), symbol: "doc.richtext")
+                        .help(L("Document renders every page through the model for Markdown output.", "Belge, Markdown çıktısı için her sayfayı modelden geçirir."))
                     Picker("", selection: Binding(
                         get: { model.options.mode },
                         set: { setMode($0) }
@@ -107,7 +108,7 @@ struct OCRWorkspace: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .disabled(model.isRunning || model.options.modelID == .appleVision)
-                    .help(model.options.modelID == .appleVision ? L("OS-managed", "Sistem yönetimli") : "")
+                    .help(computeHelp)
                 }
                 Spacer(minLength: 0)
                 VStack(alignment: .trailing, spacing: 6) {
@@ -374,6 +375,12 @@ struct OCRWorkspace: View {
     }
 
     private func setModel(_ id: OCRModelID) {
+        if let entry = OCRModelCatalog.entry(for: id),
+           entry.cpuUnsupportedReason != nil,
+           model.options.compute == .cpu {
+            model.options.compute = .automatic
+            runtime.ocrComputePreference = OCRComputePreference.automatic.rawValue
+        }
         model.options.modelID = id
         if !supportedModes.contains(model.options.mode) { model.options.mode = .text }
         runtime.ocrDefaultModelID = id.rawValue
@@ -384,6 +391,13 @@ struct OCRWorkspace: View {
         model.options.mode = mode
         runtime.ocrMode = mode.rawValue
         model.markOptionsChanged()
+    }
+
+    private var computeHelp: String {
+        if model.options.modelID == .appleVision { return L("OS-managed", "Sistem yönetimli") }
+        if let reason = OCRModelCatalog.entry(for: model.options.modelID)?.cpuUnsupportedReason,
+           model.options.compute == .cpu { return reason }
+        return ""
     }
 
     private func setCompute(_ compute: OCRComputePreference) {

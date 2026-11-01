@@ -23,10 +23,10 @@ enum OCRFixtures {
                 .foregroundColor: NSColor.black,
             ]
             let attributed = NSAttributedString(string: string, attributes: attributes)
-            let line = CTLineCreateWithAttributedString(attributed)
-            let bounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-            context.textPosition = CGPoint(x: 60, y: (size.height - bounds.height) / 2 - bounds.minY)
-            CTLineDraw(line, context)
+            let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+            let path = CGPath(rect: CGRect(x: 60, y: 40, width: size.width - 120, height: size.height - 80), transform: nil)
+            let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, 0), path, nil)
+            CTFrameDraw(frame, context)
         }
     }
 

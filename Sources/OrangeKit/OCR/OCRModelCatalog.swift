@@ -30,6 +30,7 @@ public struct OCRModelEntry: Sendable {
     public var provenance: String
     public var estimatedWorkingSetBytes: Int64
     public var projectorCPUOnly: Bool
+    public var cpuUnsupportedReason: String?
     public var scoreNote: String?
 
     public var totalBytes: Int64 { artifacts.reduce(0) { $0 + $1.byteCount } }
@@ -54,6 +55,7 @@ public enum OCRModelCatalog {
         provenance: "producer",
         estimatedWorkingSetBytes: 0,
         projectorCPUOnly: false,
+        cpuUnsupportedReason: nil,
         scoreNote: nil
     )
 
@@ -72,11 +74,12 @@ public enum OCRModelCatalog {
             license: "MIT",
             licenseURL: "https://huggingface.co/zai-org/GLM-OCR",
             sourceURL: "https://huggingface.co/ggml-org/GLM-OCR-GGUF",
-            modes: [.text],
+            modes: [.text, .document],
             languageClaim: "Yerel ölçüm yapılmadı",
             provenance: "ggml-conversion",
             estimatedWorkingSetBytes: 3_000_000_000,
             projectorCPUOnly: false,
+            cpuUnsupportedReason: nil,
             scoreNote: "94.62 OmniDocBench v1.5 (upstream pipeline, not this build)"
         ),
         OCRModelEntry(
@@ -91,11 +94,12 @@ public enum OCRModelCatalog {
             license: "Apache-2.0",
             licenseURL: "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF",
             sourceURL: "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF",
-            modes: [.text],
+            modes: [.text, .document],
             languageClaim: "Yerel ölçüm yapılmadı",
             provenance: "producer",
             estimatedWorkingSetBytes: 4_000_000_000,
             projectorCPUOnly: false,
+            cpuUnsupportedReason: "Vision encoder hangs on CPU backend (upstream llama.cpp); Metal required.",
             scoreNote: "96.33 OmniDocBench v1.6 (upstream pipeline, not this build)"
         ),
         OCRModelEntry(
@@ -115,6 +119,7 @@ public enum OCRModelCatalog {
             provenance: "producer",
             estimatedWorkingSetBytes: 4_000_000_000,
             projectorCPUOnly: false,
+            cpuUnsupportedReason: nil,
             scoreNote: nil
         ),
         OCRModelEntry(
@@ -129,11 +134,12 @@ public enum OCRModelCatalog {
             license: "MIT",
             licenseURL: "https://github.com/rednote-hilab/dots.ocr/blob/master/LICENSE",
             sourceURL: "https://huggingface.co/ggml-org/dots.ocr-GGUF",
-            modes: [.text],
+            modes: [.text, .document],
             languageClaim: "Yerel ölçüm yapılmadı",
             provenance: "ggml-conversion",
             estimatedWorkingSetBytes: 6_000_000_000,
             projectorCPUOnly: false,
+            cpuUnsupportedReason: nil,
             scoreNote: nil
         ),
         OCRModelEntry(
@@ -148,11 +154,12 @@ public enum OCRModelCatalog {
             license: "Apache-2.0",
             licenseURL: "https://huggingface.co/deepseek-ai/DeepSeek-OCR-2",
             sourceURL: "https://huggingface.co/42ailab/DeepSeek-OCR-2-GGUF",
-            modes: [.text],
+            modes: [.text, .document],
             languageClaim: "Türkçe: yerel ölçüm yapılmadı",
             provenance: "community",
             estimatedWorkingSetBytes: 5_000_000_000,
             projectorCPUOnly: true,
+            cpuUnsupportedReason: nil,
             scoreNote: "Community mirror; hybrid precision note applies"
         ),
     ]

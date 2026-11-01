@@ -92,8 +92,12 @@ final class OCRDownloadedModelTests: XCTestCase {
         let engine = NativeOCREngine(helperURL: helper, store: store)
         _ = try await engine.recognize(OCRFixtures.blankCGImage(), options: OCROptions(modelID: .glmOCR, mode: .text, compute: .cpu))
         await engine.shutdownForTests()
-        // Give the process a moment to exit, then assert no growth.
-        try await Task.sleep(nanoseconds: 500_000_000)
+        // stopHelper sends terminate, waits 2s, then SIGKILLs; poll up to 10s.
+        var remaining = 100
+        while OCRProcessCount.helperCount() > before && remaining > 0 {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            remaining -= 1
+        }
         XCTAssertLessThanOrEqual(OCRProcessCount.helperCount(), before)
     }
 
@@ -124,6 +128,9 @@ final class OCRDownloadedModelTests: XCTestCase {
     private func runCase(id: OCRModelID, compute: OCRComputePreference, document: Bool = false) async throws {
         guard let entry = OCRModelCatalog.entry(for: id) else { XCTFail("missing catalog"); return }
         let (helper, store) = try require(entry: entry)
+        if compute == .cpu, let reason = entry.cpuUnsupportedReason {
+            throw XCTSkip("CPU unsupported for \(entry.displayName): \(reason)")
+        }
         if compute == .metal, !OCRDeviceCaps.hasMetal {
             throw XCTSkip("No Metal device on this Mac; Metal case cannot pass here.")
         }
