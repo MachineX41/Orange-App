@@ -65,11 +65,11 @@ struct EditorScaffold<Stage: View, Inspector: View, Footer: View>: View {
                 Button(primaryTitle, action: apply)
                     .buttonStyle(.glassProminent)
                     .tint(OrangeTheme.accent)
-                    .keyboardShortcut(.defaultAction)
                     .disabled(!canApply || busy)
             }
             .controlSize(.large)
         }
+        .background(EditorKeyMonitor(enabled: canApply && !busy, onReturn: apply, onEscape: editor.close))
         .padding(.horizontal, 18)
         .padding(.bottom, 18)
         .padding(.top, 8)
@@ -106,6 +106,73 @@ extension EditorScaffold where Footer == EmptyView {
         @ViewBuilder inspector: () -> Inspector
     ) {
         self.init(primaryTitle: primaryTitle, canApply: canApply, busy: busy, apply: apply, stage: stage, inspector: inspector) { EmptyView() }
+    }
+}
+
+/// Return applies and Escape cancels, including when a glass button does not become the window’s default button.
+private struct EditorKeyMonitor: NSViewRepresentable {
+    var enabled: Bool
+    var onReturn: () -> Void
+    var onEscape: () -> Void
+
+    func makeNSView(context: Context) -> MonitorView {
+        let view = MonitorView()
+        view.enabled = enabled
+        view.onReturn = onReturn
+        view.onEscape = onEscape
+        return view
+    }
+
+    func updateNSView(_ view: MonitorView, context: Context) {
+        view.enabled = enabled
+        view.onReturn = onReturn
+        view.onEscape = onEscape
+        view.installIfNeeded()
+    }
+
+    final class MonitorView: NSView {
+        var enabled = false
+        var onReturn: () -> Void = {}
+        var onEscape: () -> Void = {}
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            installIfNeeded()
+        }
+
+        func installIfNeeded() {
+            guard window != nil, monitor == nil else {
+                if window == nil, let monitor {
+                    NSEvent.removeMonitor(monitor)
+                    self.monitor = nil
+                }
+                return
+            }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                if event.window?.firstResponder is NSText { return event }
+                let chars = event.charactersIgnoringModifiers ?? ""
+                let isReturn = event.keyCode == 36 || event.keyCode == 76 || chars == "\r" || chars == "\u{3}"
+                let isEscape = event.keyCode == 53 || chars == "\u{1b}"
+                if isReturn {
+                    guard self.enabled else { return event }
+                    let action = self.onReturn
+                    DispatchQueue.main.async(execute: action)
+                    return nil
+                }
+                if isEscape {
+                    let action = self.onEscape
+                    DispatchQueue.main.async(execute: action)
+                    return nil
+                }
+                return event
+            }
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
     }
 }
 

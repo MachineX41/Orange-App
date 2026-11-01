@@ -201,6 +201,16 @@ final class DragWatcher {
         } else {
             nil
         }
+        // Letting go of the modifier cancels the wheel. The drag itself can continue.
+        if wanted == nil {
+            if mode != nil {
+                mode = nil
+                runtime.globalWheel = nil
+                runtime.globalHighlight = nil
+                GlobalWheel.shared.hide()
+            }
+            return
+        }
         guard let wanted, wanted != mode, let session = runtime.session(wanted, files: files) else { return }
         mode = wanted
         runtime.globalHighlight = nil

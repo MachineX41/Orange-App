@@ -38,7 +38,7 @@ struct ShortcutsSheet: View {
             Group(title: L("Drag wheel, anywhere", "Sürükleme çarkı, her yerde"), symbol: "hand.draw", items: WheelMode.allCases.map { mode in
                 Item(keys: [mode.key], title: L("Hold while dragging: \(mode.title)", "Sürüklerken basılı tut: \(mode.title)"))
             } + [
-                Item(keys: ["esc"], title: L("Release the key to cancel", "Vazgeçmek için tuşu bırakın"))
+                Item(keys: ["⇧⌘⌃"], title: L("Release to cancel", "Bırakınca iptal olur"))
             ]),
             Group(title: L("Wheel in this window", "Pencerede çark"), symbol: "circle.dashed", items: WheelMode.allCases.map { mode in
                 Item(keys: ["⌘", String(mode.menuKey.character).uppercased()], title: L("\(mode.title) wheel for selection", "Seçim için \(mode.title) çarkı"))
