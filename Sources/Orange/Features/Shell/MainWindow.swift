@@ -2,6 +2,12 @@ import AppKit
 import OrangeKit
 import SwiftUI
 
+/// Shared by the welcome tour and the first working window, so one opens into the other.
+enum StudioWindow {
+    static let width: CGFloat = 960
+    static let height: CGFloat = 680
+}
+
 struct MainWindow: View {
     @Environment(AppRuntime.self) private var runtime
     @Environment(\.openWindow) private var openWindow
@@ -9,7 +15,6 @@ struct MainWindow: View {
     @State var dropTargeted = false
 
     @State private var host: NSWindow?
-    @State private var frameBeforeTour: NSRect?
     @State private var tourMounted: Bool
     @State private var tourVisible: Bool
     @State private var panelMounted: Bool
@@ -17,7 +22,6 @@ struct MainWindow: View {
     @State private var chromeReady: Bool
     @State private var settled: Bool
     @State private var transitioning = false
-    @State private var panelTarget: NSRect = .zero
     @State private var assemblyMounted = false
     @State private var assemblySlices = 0
     @State private var assemblyLit = false
@@ -58,21 +62,23 @@ struct MainWindow: View {
         .animation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.62, dampingFraction: 0.9), value: tourVisible)
         .animation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.78, dampingFraction: 0.88), value: panelVisible)
         .frame(
-            minWidth: panelVisible ? 940 : 760,
-            idealWidth: panelVisible ? 1200 : 760,
-            minHeight: panelVisible ? 640 : 560,
-            idealHeight: panelVisible ? 800 : 560
+            minWidth: StudioWindow.width,
+            idealWidth: StudioWindow.width,
+            minHeight: StudioWindow.height,
+            idealHeight: StudioWindow.height
         )
-        .animation(reduceMotion ? nil : .spring(response: 0.78, dampingFraction: 0.88), value: panelVisible)
         .toolbar(chromeReady ? .visible : .hidden, for: .windowToolbar)
         .background(WindowReader { window in
             if host !== window { host = window }
         })
         .onAppear {
             runtime.openWindowAction = openWindow
-            guard runtime.showOnboarding else { return }
-            fitTourWindow(animated: false)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { fitTourWindow(animated: false) }
+            if runtime.showOnboarding {
+                fitTourWindow(animated: false)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { fitTourWindow(animated: false) }
+            } else {
+                growToDefaultIfSmaller()
+            }
         }
         .onChange(of: runtime.showOnboarding) { wasShowing, showing in
             if showing { presentTour() }
@@ -80,6 +86,7 @@ struct MainWindow: View {
         }
         .onChange(of: host) { _, _ in
             if runtime.showOnboarding { fitTourWindow(animated: false) }
+            else { growToDefaultIfSmaller() }
         }
     }
 
@@ -158,7 +165,7 @@ struct MainWindow: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: runtime.localWheel)
     }
 
-    /// Grows the tour window into the panel. The backdrop never changes, so the two views crossfade inside one motion.
+    /// Reveals the panel inside the tour window. The window stays at the tour size, so the wheel opens into the panel without a resize.
     private func revealPanel() {
         panelMounted = true
         guard !reduceMotion else {
@@ -166,7 +173,6 @@ struct MainWindow: View {
             tourMounted = false
             panelVisible = true
             showChrome()
-            resize(toPanel: false)
             return
         }
         transitioning = true
@@ -203,9 +209,6 @@ struct MainWindow: View {
             settled = true
             assemblyMounted = false
             transitioning = false
-            if let host, host.frame.width < 1100 {
-                host.setFrame(frame(fittingContent: NSSize(width: 1200, height: 800), in: host), display: true, animate: true)
-            }
         }
     }
 
@@ -245,10 +248,9 @@ struct MainWindow: View {
 
     private func fitTourWindow(animated: Bool) {
         guard let host, !transitioning || animated else { return }
-        if host.frame.width > 860 { frameBeforeTour = host.frame }
         host.titleVisibility = .hidden
         host.titlebarAppearsTransparent = true
-        let target = frame(fittingContent: NSSize(width: 760, height: 560), in: host)
+        let target = frame(fittingContent: NSSize(width: StudioWindow.width, height: StudioWindow.height), in: host)
         guard abs(host.frame.width - target.width) > 12 || abs(host.frame.height - target.height) > 12 else { return }
         if animated {
             animate(host, to: target, duration: 0.55)
@@ -257,27 +259,13 @@ struct MainWindow: View {
         }
     }
 
-    private func resize(toPanel animated: Bool) {
+    /// The previous default, 760×560, is below the new opening size. A window still sitting there grows once.
+    private func growToDefaultIfSmaller() {
         guard let host else { return }
-        let target: NSRect
-        if let frameBeforeTour, frameBeforeTour.width > 860 {
-            target = frameBeforeTour
-        } else {
-            target = frame(fittingContent: NSSize(width: 1200, height: 800), in: host)
-        }
-        frameBeforeTour = nil
-        panelTarget = target
-        if animated {
-            animate(host, to: target, duration: 0.7)
-        } else {
-            host.setFrame(target, display: true)
-        }
-    }
-
-    private func lockPanelFrame() {
-        guard let host, panelTarget.width > 860 else { return }
-        guard abs(host.frame.width - panelTarget.width) > 6 || abs(host.frame.height - panelTarget.height) > 6 else { return }
-        host.setFrame(panelTarget, display: true)
+        let content = host.contentRect(forFrameRect: host.frame).size
+        guard content.width < 820, content.height < 620 else { return }
+        let target = frame(fittingContent: NSSize(width: StudioWindow.width, height: StudioWindow.height), in: host)
+        host.setFrame(target, display: true)
     }
 
     private func frame(fittingContent size: NSSize, in window: NSWindow) -> NSRect {

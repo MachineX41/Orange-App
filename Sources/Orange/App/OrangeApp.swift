@@ -13,10 +13,7 @@ struct OrangeApp: App {
                 .preferredColorScheme(runtime.appearance.colorScheme)
                 .tint(OrangeTheme.accent)
         }
-        .defaultSize(
-            width: AppRuntime.shared.showOnboarding ? 760 : 1200,
-            height: AppRuntime.shared.showOnboarding ? 560 : 800
-        )
+        .defaultSize(width: StudioWindow.width, height: StudioWindow.height)
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {

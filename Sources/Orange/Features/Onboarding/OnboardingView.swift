@@ -27,7 +27,7 @@ struct OnboardingView: View {
 
             footer
         }
-        .frame(width: 760, height: 560)
+        .frame(width: StudioWindow.width, height: StudioWindow.height)
         .background(OrangeBackdrop())
         .interactiveDismissDisabled()
     }
