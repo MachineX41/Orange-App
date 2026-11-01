@@ -85,6 +85,15 @@ public actor OCRService {
             let content = OCRPageContent(text: text, actualCompute: .appleManaged)
             return OCRPageResult(sourceURL: source.url, pageIndex: pageIndex, content: content, embeddedTextUsed: true)
         case .image(let image):
+            // Region pipeline: VLM + document mode splits the page via Apple
+            // layout, asks the VLM per text region, crops figures to files.
+            // Never asks the VLM about pixels (Marker/MinerU/dots.ocr recipe).
+            if options.modelID != .appleVision, options.mode == .document,
+               let native = nativeEngine {
+                let content = try await recognizeRegions(
+                    image, source: source, pageIndex: pageIndex, options: options, native: native)
+                return OCRPageResult(sourceURL: source.url, pageIndex: pageIndex, content: content)
+            }
             let active = (options.modelID == .appleVision) ? engine : (nativeEngine ?? engine)
             let content: OCRPageContent
             do {
@@ -95,6 +104,111 @@ public actor OCRService {
             }
             return OCRPageResult(sourceURL: source.url, pageIndex: pageIndex, content: content)
         }
+    }
+
+    /// Region-based document recognition: Apple layout -> VLM per text region.
+    private func recognizeRegions(
+        _ image: CGImage, source: OCRDocumentSource, pageIndex: Int,
+        options: OCROptions, native: any OCREngine
+    ) async throws -> OCRPageContent {
+        let started = ContinuousClock.now
+        // 1. Fast Apple layout pass for line boxes (text recognition is cheap;
+        // we only need bounds, transcription comes from the VLM).
+        var layoutOptions = OCROptions.appleDefault
+        layoutOptions.mode = .text
+        let layout = try await engine.recognize(image, options: layoutOptions)
+        let lines = layout.blocks.filter { $0.bounds != .null }
+        // 2. Group lines into row bands (reading order: top to bottom, left to right).
+        let bands = groupLinesIntoBands(lines)
+        // 3. Ask the VLM per band crop (text mode: terse trigger, no figure talk).
+        var textOptions = options
+        textOptions.mode = .text
+        var regions: [OCRRegion] = []
+        var markdownParts: [String] = []
+        var textParts: [String] = []
+        var truncated = false
+        for band in bands {
+            try Task.checkCancellation()
+            guard let crop = crop(image, to: band) else { continue }
+            let content = try await native.recognize(crop, options: textOptions)
+            truncated = truncated || content.truncated
+            let clean = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !clean.isEmpty else { continue }
+            regions.append(OCRRegion(kind: .text, bounds: band, text: clean))
+            markdownParts.append(clean)
+            textParts.append(clean)
+        }
+        // 4. Figures: large areas not covered by text -> crop to caller-provided dir.
+        // (Extraction to files happens at export; here we record bounds only.)
+        for box in figureBoxes(pageSize: CGSize(width: 1, height: 1), covered: bands) {
+            regions.append(OCRRegion(kind: .figure, bounds: box))
+        }
+        regions.sort { readingOrder($0.bounds, $1.bounds) }
+        let elapsed = ContinuousClock.now - started
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return OCRPageContent(
+            text: textParts.joined(separator: "\n\n"),
+            markdown: markdownParts.joined(separator: "\n\n"),
+            blocks: layout.blocks,
+            regions: regions,
+            actualCompute: .metal,
+            durationSeconds: seconds,
+            truncated: truncated
+        )
+    }
+
+    /// Groups line boxes into horizontal bands: lines whose vertical centers
+    /// are within half a line-height merge; bands split on large gaps.
+    private func groupLinesIntoBands(_ lines: [OCRTextBlock]) -> [CGRect] {
+        let sorted = lines.map(\.bounds).sorted {
+            if abs($0.midY - $1.midY) > 0.005 { return $0.midY < $1.midY }
+            return $0.minX < $1.minX
+        }
+        var bands: [CGRect] = []
+        for box in sorted {
+            guard box != .null, box.width > 0.01, box.height > 0 else { continue }
+            if let last = bands.last,
+               abs(box.midY - last.midY) < max(box.height, last.height) * 0.9 {
+                bands[bands.count - 1] = last.union(box)
+            } else {
+                bands.append(box)
+            }
+        }
+        // Pad slightly so descenders/ascenders survive the crop.
+        return bands.map { $0.insetBy(dx: -0.005, dy: -0.004) }
+            .map { $0.intersection(CGRect(x: 0, y: 0, width: 1, height: 1)) }
+    }
+
+    /// Gaps between text bands wider than 8% of page height are figure candidates.
+    private func figureBoxes(pageSize: CGSize, covered: [CGRect]) -> [CGRect] {
+        _ = pageSize
+        let sorted = covered.sorted { $0.minY < $1.minY }
+        var boxes: [CGRect] = []
+        var cursor: CGFloat = 0
+        for band in sorted {
+            let gap = CGRect(x: 0, y: cursor, width: 1, height: band.minY - cursor)
+            if gap.height > 0.08 { boxes.append(gap) }
+            cursor = max(cursor, band.maxY)
+        }
+        let tail = CGRect(x: 0, y: cursor, width: 1, height: 1 - cursor)
+        if tail.height > 0.08 { boxes.append(tail) }
+        return boxes
+    }
+
+    private func readingOrder(_ a: CGRect, _ b: CGRect) -> Bool {
+        if abs(a.midY - b.midY) > 0.01 { return a.midY < b.midY }
+        return a.minX < b.minX
+    }
+
+    private func crop(_ image: CGImage, to normalized: CGRect) -> CGImage? {
+        let rect = CGRect(
+            x: normalized.minX * CGFloat(image.width),
+            y: normalized.minY * CGFloat(image.height),
+            width: normalized.width * CGFloat(image.width),
+            height: normalized.height * CGFloat(image.height)
+        ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard rect.width >= 16, rect.height >= 16 else { return nil }
+        return image.cropping(to: rect)
     }
 
     /// Preflight memory gate: estimated working set vs half of physical RAM.

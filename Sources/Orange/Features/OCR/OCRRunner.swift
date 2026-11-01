@@ -122,6 +122,7 @@ final class OCRRunner {
         model.pages[index].embeddedTextUsed = page.embeddedTextUsed
         model.pages[index].actualCompute = page.content.actualCompute
         model.pages[index].stale = false
+        model.pages[index].regions = page.content.regions
         model.activeComputeLabel = computeLabel(page.content.actualCompute)
     }
 
@@ -166,6 +167,8 @@ final class OCRRunner {
                 from: source.url, into: dir,
                 baseName: OutputLocation.baseName(source.url))) ?? []
         }
+        // Region figures: crop from the rendered page, save beside the export.
+        let regionRefs = saveRegionFigures(pages: model.pages)
         let markdown = stripped.enumerated().map { index, body in
             var section = "<!-- page \(index + 1) -->\n\n\(OCRPostprocess.sanitizeFigureURLs(body))"
             if index < imageRefs.count {
@@ -173,10 +176,57 @@ final class OCRRunner {
                     section += "\n\n![Figure](\(ref))"
                 }
             }
+            if index < regionRefs.count {
+                for ref in regionRefs[index] {
+                    section += "\n\n![Figure](\(ref))"
+                }
+            }
             return section
         }.joined(separator: "\n\n---\n\n")
         let base = model.sources.first?.url ?? URL(fileURLWithPath: "OCR.md")
         return try write(text: markdown, extension: "md", source: base)
+    }
+
+    /// Crops figure regions from rendered pages into `<base>-regions/`.
+    /// Returns relative paths aligned with model.pages.
+    private func saveRegionFigures(pages: [OCRWorkspaceModel.PageState]) -> [[String]] {
+        guard let sourceURL = model.sources.first?.url else { return [] }
+        let dir = OutputLocation.directory(beside: sourceURL)
+        let base = OutputLocation.baseName(sourceURL)
+        let folder = dir.appendingPathComponent("\(base)-regions", isDirectory: true)
+        var out: [[String]] = []
+        for page in pages {
+            let figs = page.regions.filter { $0.kind == .figure }
+            guard !figs.isEmpty else {
+                out.append([])
+                continue
+            }
+            guard let image = try? OCRDocumentSource(url: page.sourceURL)
+                .renderImage(pageIndex: page.pageIndex, maxSide: 1600)
+            else {
+                out.append([])
+                continue
+            }
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            var paths: [String] = []
+            for (i, region) in figs.enumerated() {
+                let rect = CGRect(
+                    x: region.bounds.minX * CGFloat(image.width),
+                    y: region.bounds.minY * CGFloat(image.height),
+                    width: region.bounds.width * CGFloat(image.width),
+                    height: region.bounds.height * CGFloat(image.height)
+                ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+                guard rect.width >= 32, rect.height >= 32,
+                      let crop = image.cropping(to: rect)
+                else { continue }
+                let name = "p\(page.pageIndex + 1)-fig\(i + 1).png"
+                let dest = folder.appendingPathComponent(name)
+                guard (try? ImageEngine.write(crop, to: dest, as: .png, quality: 1.0)) != nil else { continue }
+                paths.append("\(base)-regions/\(name)")
+            }
+            out.append(paths)
+        }
+        return out
     }
 
     private func write(text: String, extension ext: String, source: URL) throws -> URL {

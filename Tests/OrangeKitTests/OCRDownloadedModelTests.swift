@@ -113,6 +113,26 @@ final class OCRDownloadedModelTests: XCTestCase {
         // Pass = no hang; cancellation propagates within the timeout below.
     }
 
+    func testRegionPipelineQwen() async throws {
+        guard let entry = OCRModelCatalog.entry(for: .qwen3VL2B) else { XCTFail("missing catalog"); return }
+        let (helper, store) = try require(entry: entry)
+        let engine = NativeOCREngine(helperURL: helper, store: store)
+        let service = OCRService(engine: AppleOCREngine(), temporaryRoot: FileManager.default.temporaryDirectory)
+        await service.configureNative(engine: engine)
+        // Scanned p2 (no text layer) forces the region pipeline.
+        let dir = try makeTempDirectory()
+        let png = dir.appendingPathComponent("region-p2.png")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/tmp/ref-p2.png"), to: png)
+        let options = OCROptions(modelID: .qwen3VL2B, mode: .document, compute: .metal)
+        let result = try await service.recognize(url: png, options: options)
+        let content = result.pages.first!.content
+        XCTAssertFalse(content.regions.isEmpty, "region pipeline must populate regions")
+        XCTAssertFalse(content.text.isEmpty)
+        XCTAssertFalse(content.text.contains("![") && content.text.contains("](http"),
+            "no invented image URLs")
+        await engine.shutdownForTests()
+    }
+
     func testGLMMultiPageMemoryBound() async throws {
         guard let entry = OCRModelCatalog.entry(for: .glmOCR) else { XCTFail("missing catalog"); return }
         let (helper, store) = try require(entry: entry)

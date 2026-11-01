@@ -101,6 +101,8 @@ public struct OCRPageContent: Sendable {
     public var markdown: String?
     public var blocks: [OCRTextBlock]
     public var tables: [OCRTable]
+    /// Regions in reading order; empty when the engine did whole-page recognition.
+    public var regions: [OCRRegion]
     public var actualCompute: OCRActualCompute
     public var durationSeconds: Double
     public var truncated: Bool
@@ -110,6 +112,7 @@ public struct OCRPageContent: Sendable {
         markdown: String? = nil,
         blocks: [OCRTextBlock] = [],
         tables: [OCRTable] = [],
+        regions: [OCRRegion] = [],
         actualCompute: OCRActualCompute,
         durationSeconds: Double = 0,
         truncated: Bool = false
@@ -118,6 +121,7 @@ public struct OCRPageContent: Sendable {
         self.markdown = markdown
         self.blocks = blocks
         self.tables = tables
+        self.regions = regions
         self.actualCompute = actualCompute
         self.durationSeconds = durationSeconds
         self.truncated = truncated
@@ -160,3 +164,31 @@ public struct OCRDocumentResult: Sendable {
 public protocol OCREngine: Sendable {
     func recognize(_ image: CGImage, options: OCROptions) async throws -> OCRPageContent
 }
+
+/// A layout region on a page: text/table goes to the VLM as a crop,
+/// figure is cropped to a real file and referenced. Follows the
+/// Marker/MinerU/dots.ocr recipe: never ask the VLM about pixels.
+public struct OCRRegion: Sendable, Equatable {
+    public enum Kind: Sendable, Equatable {
+        case text
+        case table
+        case figure
+    }
+
+    public var kind: Kind
+    /// Normalized top-left-origin rect in unit space.
+    public var bounds: CGRect
+    /// VLM transcription for text/table; nil for figure.
+    public var text: String?
+    /// Local image path for figure; nil otherwise.
+    public var imagePath: String?
+
+    public init(kind: Kind, bounds: CGRect, text: String? = nil, imagePath: String? = nil) {
+        self.kind = kind
+        self.bounds = bounds
+        self.text = text
+        self.imagePath = imagePath
+    }
+}
+
+

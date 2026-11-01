@@ -36,6 +36,7 @@ final class OCRWorkspaceModel {
         var embeddedTextUsed = false
         var actualCompute: OCRActualCompute = .appleManaged
         var stale = false
+        var regions: [OCRRegion] = []
     }
 
     var sources: [SourceFile] = []
