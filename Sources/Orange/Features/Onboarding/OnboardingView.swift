@@ -113,6 +113,35 @@ struct OnboardingView: View {
 
 // MARK: Pages
 
+/// One column for every step, so titles and cards share the same width inside the window.
+private enum TourMetrics {
+    static let content: CGFloat = 760
+    static let radius: CGFloat = 20
+}
+
+private extension View {
+    func tourWidth() -> some View {
+        frame(maxWidth: TourMetrics.content)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+private struct TourPage<Content: View>: View {
+    var spacing: CGFloat = 20
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GeometryReader { geo in
+            VStack(spacing: spacing) {
+                content()
+            }
+            .padding(.horizontal, 36)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
+        }
+    }
+}
+
 private struct PageTitle: View {
     var title: String
     var subtitle: String
@@ -120,15 +149,15 @@ private struct PageTitle: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(title)
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
             Text(subtitle)
                 .font(.system(size: 13.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 520)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .tourWidth()
     }
 }
 
@@ -136,9 +165,8 @@ private struct WelcomePage: View {
     @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: 26) {
-            Spacer(minLength: 0)
-            OrangeMark(side: 96)
+        TourPage(spacing: 22) {
+            OrangeMark(side: 84)
                 .shadow(color: OrangeTheme.accent.opacity(0.25), radius: 18, y: 8)
                 .scaleEffect(appeared ? 1 : 0.8)
                 .opacity(appeared ? 1 : 0)
@@ -151,8 +179,7 @@ private struct WelcomePage: View {
                 feature("slider.horizontal.3", L("Edit", "Düzenle"), L("Crop, trim, compress, redact and more", "Kırp, kes, sıkıştır, gizle ve fazlası"), delay: 0.18)
                 feature("tray.and.arrow.down", L("Move", "Taşı"), L("Shelf, AirDrop, zip and quick actions", "Raf, AirDrop, sıkıştırma ve hızlı eylemler"), delay: 0.26)
             }
-            .padding(.horizontal, 40)
-            Spacer(minLength: 0)
+            .tourWidth()
         }
         .onAppear {
             withAnimation(.spring(response: 0.55, dampingFraction: 0.75)) { appeared = true }
@@ -171,8 +198,8 @@ private struct WelcomePage: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
-        .glassCard(radius: 18)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+        .glassCard(radius: TourMetrics.radius)
         .offset(y: appeared ? 0 : 14)
         .opacity(appeared ? 1 : 0)
         .animation(.spring(response: 0.5, dampingFraction: 0.82).delay(delay), value: appeared)
@@ -183,29 +210,28 @@ private struct WheelPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 22) {
+        TourPage {
             PageTitle(
                 title: L("Drag, hold a key, drop", "Sürükle, tuşa bas, bırak"),
                 subtitle: L("Start dragging a file anywhere, in Finder or any app. Hold a key and a wheel opens under the pointer. It stays put, so you just drop on a slice.", "Finder’da ya da herhangi bir uygulamada bir dosyayı sürüklemeye başlayın. Bir tuşa basılı tutun, imlecin altında bir çark açılır. Çark yerinde durur, dosyayı bir dilime bırakmanız yeterli.")
             )
-            .padding(.top, 34)
             TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 let period = HowItWorks.period
                 let progress = reduceMotion ? 0.6 : time.truncatingRemainder(dividingBy: period) / period
                 let mode = WheelMode.allCases[reduceMotion ? 0 : Int(time / period) % WheelMode.allCases.count]
-                HStack(spacing: 22) {
+                HStack(alignment: .center, spacing: 28) {
                     WheelDemo(mode: mode, progress: progress)
-                        .frame(width: 250, height: 190)
-                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    VStack(alignment: .leading, spacing: 10) {
+                        .frame(width: 280, height: 220)
+                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    VStack(alignment: .leading, spacing: 12) {
                         ForEach(WheelMode.allCases, id: \.self) { item in
                             HStack(alignment: .top, spacing: 12) {
                                 KeyCap(text: item.key, pressed: item == mode)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.title).font(.system(size: 13.5, weight: .semibold))
                                     Text(item.explanation)
-                                        .font(.system(size: 12))
+                                        .font(.system(size: 12.5))
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -213,17 +239,17 @@ private struct WheelPage: View {
                             .animation(.easeOut(duration: 0.2), value: mode)
                         }
                     }
-                    .frame(width: 300, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(18)
-                .glassCard(radius: 22)
+                .padding(20)
+                .tourWidth()
+                .glassCard(radius: TourMetrics.radius)
             }
             Text(L("Inside Orange, select files and press ⌘E, ⌘T or ⌘J for the same wheels. ⌘/ lists every shortcut.", "Orange içinde dosya seçip ⌘E, ⌘T ya da ⌘J ile aynı çarkları açabilirsiniz. ⌘/ tüm kısayolları gösterir."))
-                .font(.system(size: 12))
+                .font(.system(size: 12.5))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 560)
-            Spacer(minLength: 0)
+                .tourWidth()
         }
     }
 }
@@ -232,12 +258,11 @@ private struct PrivacyPage: View {
     @Binding var agreed: Bool
 
     var body: some View {
-        VStack(spacing: 18) {
+        TourPage(spacing: 16) {
             PageTitle(
                 title: L("Private by design", "Gizlilik öncelikli"),
                 subtitle: L("Please read how Orange treats your files before you start.", "Başlamadan önce Orange’ın dosyalarınızı nasıl ele aldığını okuyun.")
             )
-            .padding(.top, 30)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -249,24 +274,27 @@ private struct PrivacyPage: View {
                     point("doc.badge.gearshape", L("Results are new copies", "Sonuçlar yeni kopyadır"), L("Originals are never overwritten. Orange is provided as is; keep backups of important files.", "Orijinaller hiçbir zaman üzerine yazılmaz. Orange olduğu gibi sunulur; önemli dosyalarınızı yedekleyin."))
                 }
                 .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: 600, height: 250)
-            .glassCard(radius: 20)
+            .frame(maxWidth: TourMetrics.content, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: TourMetrics.radius, style: .continuous))
+            .glassCard(radius: TourMetrics.radius)
 
             VStack(spacing: 8) {
                 Toggle(isOn: $agreed.animation(.easeOut(duration: 0.15))) {
                     Text(L("I have read and accept the Privacy Notice and Terms of Use.", "Gizlilik Bildirimi’ni ve Kullanım Koşulları’nı okudum, kabul ediyorum."))
                         .font(.system(size: 13, weight: .medium))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .toggleStyle(.checkbox)
                 HStack(spacing: 14) {
                     Link(L("Privacy Notice", "Gizlilik Bildirimi"), destination: Consent.privacyURL)
                     Link(L("Terms of Use", "Kullanım Koşulları"), destination: Consent.termsURL)
                 }
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(OrangeTheme.accent)
             }
-            Spacer(minLength: 0)
+            .tourWidth()
         }
     }
 
@@ -294,12 +322,11 @@ private struct PermissionsPage: View {
 
     var body: some View {
         @Bindable var runtime = runtime
-        VStack(spacing: 18) {
+        TourPage {
             PageTitle(
                 title: L("Permissions, on your terms", "İzinler sizin kontrolünüzde"),
                 subtitle: L("macOS asks before any app reads Desktop, Documents or Downloads. Grant the folders you use, now or later. You can change this in System Settings any time.", "macOS, bir uygulama Masaüstü, Belgeler ya da İndirilenler’e erişmeden önce size sorar. Kullandığınız klasörlere şimdi ya da sonra izin verin. Bunu her zaman Sistem Ayarları’ndan değiştirebilirsiniz.")
             )
-            .padding(.top, 30)
 
             VStack(spacing: 0) {
                 ForEach(ProtectedFolder.allCases) { folder in
@@ -308,8 +335,8 @@ private struct PermissionsPage: View {
                 }
             }
             .padding(.vertical, 6)
-            .frame(width: 600)
-            .glassCard(radius: 20)
+            .tourWidth()
+            .glassCard(radius: TourMetrics.radius)
 
             VStack(spacing: 0) {
                 switchRow(
@@ -326,16 +353,17 @@ private struct PermissionsPage: View {
                     isOn: $runtime.showInMenuBar
                 )
             }
-            .frame(width: 600)
-            .glassCard(radius: 20)
+            .tourWidth()
+            .glassCard(radius: TourMetrics.radius)
 
             if let error = permissions.loginItemError {
-                Text(error).font(.system(size: 11.5)).foregroundStyle(OrangeTheme.ember)
+                Text(error).font(.system(size: 12)).foregroundStyle(OrangeTheme.ember).tourWidth()
             }
             Text(L("Orange never asks for Accessibility, Screen Recording, Camera, Microphone, Contacts or Location.", "Orange hiçbir zaman Erişilebilirlik, Ekran Kaydı, Kamera, Mikrofon, Kişiler ya da Konum izni istemez."))
-                .font(.system(size: 11.5))
+                .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
-            Spacer(minLength: 0)
+                .multilineTextAlignment(.center)
+                .tourWidth()
         }
         .onAppear { permissions.refreshLoginItem() }
     }
@@ -348,7 +376,7 @@ private struct PermissionsPage: View {
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(.system(size: 13, weight: .semibold))
-                Text(text).font(.system(size: 11.5)).foregroundStyle(.secondary)
+                Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 10)
             Toggle(title, isOn: isOn)
@@ -374,7 +402,7 @@ struct FolderRow: View {
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text(folder.title).font(.system(size: 13, weight: .semibold))
-                Text(folder.reason).font(.system(size: 11.5)).foregroundStyle(.secondary)
+                Text(folder.reason).font(.system(size: 12)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 10)
             Group {
@@ -405,14 +433,12 @@ struct FolderRow: View {
 }
 
 private struct ReadyPage: View {
-    @Environment(AppRuntime.self) private var runtime
     @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 0)
+        TourPage(spacing: 22) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 54))
+                .font(.system(size: 48))
                 .foregroundStyle(.white, OrangeTheme.accent)
                 .symbolEffect(.bounce, value: appeared)
                 .scaleEffect(appeared ? 1 : 0.6)
@@ -421,16 +447,16 @@ private struct ReadyPage: View {
                 title: L("You’re all set", "Her şey hazır"),
                 subtitle: L("A few shortcuts to remember. You can replay this tour from the Help menu.", "Akılda tutulacak birkaç kısayol. Bu tanıtımı Yardım menüsünden yeniden izleyebilirsiniz.")
             )
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 row(["⇧", "⌘", "⌃"], L("While dragging: Convert, Tools, Actions", "Sürüklerken: Dönüştür, Araçlar, Eylemler"))
                 row(["⌘", "O"], L("Open files", "Dosya aç"))
                 row(["⌘", "E"], L("Wheel for the selection", "Seçim için çark"))
                 row(["⌘", "/"], L("All keyboard shortcuts", "Tüm klavye kısayolları"))
             }
-            .padding(18)
-            .frame(width: 440)
-            .glassCard(radius: 20)
-            Spacer(minLength: 0)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .tourWidth()
+            .glassCard(radius: TourMetrics.radius)
         }
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) { appeared = true }
