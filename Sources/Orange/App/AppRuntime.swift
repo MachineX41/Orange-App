@@ -90,7 +90,7 @@ final class AppRuntime {
 
     private init() {
         let defaults = UserDefaults.standard
-        appearance = AppearanceChoice(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
+        appearance = AppearanceChoice(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .dark
         let language = LanguageChoice(rawValue: defaults.string(forKey: Lang.defaultsKey) ?? "") ?? .system
         self.language = language
         Lang.choice = language
