@@ -366,9 +366,18 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(Lang.t("Save", "Kaydet"), "Kaydet")
 
         Lang.choice = .system
-        let followsTurkish = Locale.preferredLanguages.first?.hasPrefix("tr") == true
+        let followsTurkish = Lang.systemPrefersTurkish()
         XCTAssertEqual(Lang.isTurkish, followsTurkish)
         XCTAssertEqual(Lang.t("Save", "Kaydet"), followsTurkish ? "Kaydet" : "Save")
+    }
+
+    func testSystemLanguageFallsBackToEnglish() {
+        XCTAssertTrue(Lang.systemPrefersTurkish(["tr-TR"]))
+        XCTAssertTrue(Lang.systemPrefersTurkish(["de", "tr"]))
+        XCTAssertFalse(Lang.systemPrefersTurkish(["en-GB"]))
+        XCTAssertFalse(Lang.systemPrefersTurkish(["en", "tr"]))
+        XCTAssertFalse(Lang.systemPrefersTurkish(["de", "fr"]))
+        XCTAssertFalse(Lang.systemPrefersTurkish([]))
     }
 }
 

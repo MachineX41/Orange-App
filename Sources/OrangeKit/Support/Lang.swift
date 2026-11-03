@@ -45,8 +45,24 @@ public enum Lang {
         switch stored {
         case .turkish: true
         case .english: false
-        case .system: Locale.preferredLanguages.first?.hasPrefix("tr") == true
+        case .system: systemPrefersTurkish()
         }
+    }
+
+    /// The default is the system language. Turkish or English is used if it appears first among the languages Orange ships; otherwise English.
+    public static func systemPrefersTurkish(_ preferred: [String] = Locale.preferredLanguages) -> Bool {
+        for identifier in preferred {
+            switch languageCode(identifier) {
+            case "tr": return true
+            case "en": return false
+            default: continue
+            }
+        }
+        return false
+    }
+
+    private static func languageCode(_ identifier: String) -> String {
+        String(identifier.split(whereSeparator: { $0 == "-" || $0 == "_" }).first ?? "").lowercased()
     }
 
     public static func t(_ english: String, _ turkish: String) -> String {
