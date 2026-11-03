@@ -11,24 +11,26 @@ struct SettingsView: View {
             SettingsPage {
                 SettingsGroup(title: L("Appearance", "Görünüm"), symbol: "circle.lefthalf.filled") {
                     SettingsRow(title: L("Language", "Dil")) {
-                        Picker(L("Language", "Dil"), selection: $runtime.language) {
-                            Text(L("System", "Sistem")).tag(LanguageChoice.system)
-                            Text("Türkçe").tag(LanguageChoice.turkish)
-                            Text("English").tag(LanguageChoice.english)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(width: 280)
+                        SettingsChoice(
+                            selection: $runtime.language,
+                            options: [
+                                (LanguageChoice.system, L("System", "Sistem")),
+                                (.turkish, "Türkçe"),
+                                (.english, "English")
+                            ],
+                            width: SettingsMetrics.choiceWidth
+                        )
                     }
                     SettingsRow(title: L("Theme", "Tema")) {
-                        Picker(L("Theme", "Tema"), selection: $runtime.appearance) {
-                            Text(L("System", "Sistem")).tag(AppearanceChoice.system)
-                            Text(L("Light", "Açık")).tag(AppearanceChoice.light)
-                            Text(L("Dark", "Koyu")).tag(AppearanceChoice.dark)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(width: 220)
+                        SettingsChoice(
+                            selection: $runtime.appearance,
+                            options: [
+                                (AppearanceChoice.system, L("System", "Sistem")),
+                                (.light, L("Light", "Açık")),
+                                (.dark, L("Dark", "Koyu"))
+                            ],
+                            width: SettingsMetrics.choiceWidth
+                        )
                     }
                     SettingsToggle(title: L("Show Orange in the menu bar", "Orange’ı menü çubuğunda göster"), isOn: $runtime.showInMenuBar)
                 }
@@ -300,6 +302,51 @@ private struct SettingsGroup<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassCard(radius: 18)
         }
+    }
+}
+
+private enum SettingsMetrics {
+    static let choiceWidth: CGFloat = 300
+}
+
+/// Equal segments on one fixed-width track. Not the system segmented control.
+private struct SettingsChoice<Value: Hashable>: View {
+    @Binding var selection: Value
+    var options: [(Value, String)]
+    var width: CGFloat
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options, id: \.0) { option in
+                let selected = option.0 == selection
+                Button {
+                    selection = option.0
+                } label: {
+                    Text(option.1)
+                        .font(.system(size: 12.5, weight: selected ? .semibold : .medium))
+                        .foregroundStyle(selected ? Color.white : Color.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background {
+                            if selected {
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill(OrangeTheme.accent)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .frame(width: width)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        }
+        .animation(.easeOut(duration: 0.15), value: selection)
     }
 }
 
