@@ -51,13 +51,7 @@ struct OnboardingView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            if step != .welcome {
-                Button(L("Back", "Geri")) { go(-1) }
-                    .buttonStyle(.glass).tint(nil)
-                    .keyboardShortcut(.leftArrow, modifiers: [])
-            }
-            Spacer()
+        ZStack {
             HStack(spacing: 6) {
                 ForEach(Step.allCases, id: \.self) { item in
                     Capsule()
@@ -65,20 +59,38 @@ struct OnboardingView: View {
                         .frame(width: item == step ? 18 : 6, height: 6)
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: step)
+            .animation(.easeOut(duration: 0.2), value: step)
             .accessibilityElement()
             .accessibilityLabel(L("Step \(step.rawValue + 1) of \(Step.allCases.count)", "Adım \(step.rawValue + 1) / \(Step.allCases.count)"))
-            Spacer()
-            Button(primaryTitle) { advance() }
+
+            HStack(spacing: 12) {
+                Button { go(-1) } label: {
+                    Text(L("Back", "Geri"))
+                        .frame(width: TourMetrics.backWidth)
+                }
+                .buttonStyle(.glass).tint(nil)
+                .keyboardShortcut(.leftArrow, modifiers: [])
+                .opacity(step == .welcome ? 0 : 1)
+                .allowsHitTesting(step != .welcome)
+                .accessibilityHidden(step == .welcome)
+                Spacer(minLength: 0)
+                Button { advance() } label: {
+                    Text(primaryTitle)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(width: TourMetrics.advanceWidth)
+                }
                 .buttonStyle(.glassProminent)
                 .tint(OrangeTheme.accent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(step == .privacy && !agreed)
                 .help(step == .privacy && !agreed ? L("Accept the privacy notice and terms to continue.", "Devam etmek için gizlilik bildirimini ve koşulları kabul edin.") : "")
+            }
         }
         .controlSize(.large)
         .padding(.horizontal, 28)
         .padding(.vertical, 18)
+        .transaction { $0.animation = nil }
     }
 
     private var primaryTitle: String {
@@ -105,7 +117,7 @@ struct OnboardingView: View {
     private func go(_ delta: Int) {
         guard let next = Step(rawValue: step.rawValue + delta) else { return }
         forward = delta > 0
-        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 0.88)) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .easeInOut(duration: 0.28)) {
             step = next
         }
     }
@@ -117,6 +129,8 @@ struct OnboardingView: View {
 private enum TourMetrics {
     static let content: CGFloat = 760
     static let radius: CGFloat = 20
+    static let backWidth: CGFloat = 108
+    static let advanceWidth: CGFloat = 292
 }
 
 private extension View {

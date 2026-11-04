@@ -41,22 +41,17 @@ struct OrangeBackdrop: View {
     var intensity: Double = 1
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 15)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            let drift = Float(sin(t / 11) * 0.05)
-            let sway = Float(cos(t / 13) * 0.04)
-            MeshGradient(
-                width: 3,
-                height: 3,
-                points: [
-                    [0, 0], [0.5 + sway, 0], [1, 0],
-                    [0, 0.5 - drift], [0.5 + drift, 0.5 + sway], [1, 0.5 + drift],
-                    [0, 1], [0.5 - sway, 1], [1, 1]
-                ],
-                colors: palette
-            )
-            .opacity(intensity)
-        }
+        MeshGradient(
+            width: 3,
+            height: 3,
+            points: [
+                [0, 0], [0.5, 0], [1, 0],
+                [0, 0.5], [0.52, 0.48], [1, 0.5],
+                [0, 1], [0.5, 1], [1, 1]
+            ],
+            colors: palette
+        )
+        .opacity(intensity)
         .ignoresSafeArea()
     }
 
