@@ -4,6 +4,17 @@ import OrangeKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppRuntime.shared.stayRunningInBackground()
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            let closing = notification.object as? NSWindow
+            Task { @MainActor in
+                AppRuntime.shared.updateBackgroundPresence(ignoring: closing)
+            }
+        }
         AppRuntime.shared.applyInterfaceAppearance()
         if Consent.accepted { DragWatcher.shared.start() }
         NSApp.activate()

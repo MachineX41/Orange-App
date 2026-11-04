@@ -49,7 +49,12 @@ final class AppRuntime {
     var soundOnDone: Bool { didSet { save() } }
     var hapticOnWheel: Bool { didSet { save() } }
     var wheelEnabled: Bool { didSet { save() } }
-    var showInMenuBar: Bool { didSet { save() } }
+    var showInMenuBar: Bool {
+        didSet {
+            save()
+            updateBackgroundPresence()
+        }
+    }
     var imageQuality: Double { didSet { save() } }
     var showShortcuts = false
     var showOnboarding = !(UserDefaults.standard.bool(forKey: "onboardingDone") && Consent.accepted)
@@ -87,6 +92,7 @@ final class AppRuntime {
     private let store = LibraryStore()
     private let defaults = UserDefaults.standard
     private var loading = true
+    @ObservationIgnored private var backgroundActivity: NSObjectProtocol?
 
     private init() {
         let defaults = UserDefaults.standard
@@ -223,7 +229,30 @@ final class AppRuntime {
         GlobalWheel.shared.applyAppearance()
     }
 
+    /// Closing the window must not quit Orange. The drag wheel keeps watching from the menu bar.
+    func stayRunningInBackground() {
+        ProcessInfo.processInfo.disableAutomaticTermination("Orange keeps the drag wheel available")
+        guard backgroundActivity == nil else { return }
+        backgroundActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep],
+            reason: "Watching file drags for the wheel"
+        )
+    }
+
+    /// With the windows closed and the menu bar icon on, leave the Dock but keep running.
+    func updateBackgroundPresence(ignoring closed: NSWindow? = nil) {
+        let documentOpen = NSApp.windows.contains { window in
+            window !== closed && window.isVisible && !(window is NSPanel) && window.level == .normal
+        }
+        let policy: NSApplication.ActivationPolicy = (documentOpen || !showInMenuBar) ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+    }
+
     func showMainWindow() {
+        if NSApp.activationPolicy() != .regular {
+            NSApp.setActivationPolicy(.regular)
+        }
         NSApp.activate()
         applyInterfaceAppearance()
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
