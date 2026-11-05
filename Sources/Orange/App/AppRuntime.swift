@@ -400,8 +400,8 @@ final class AppRuntime {
                 [try PDFToolkit.imagesToPDF(sources: urls, into: OutputLocation.directory(beside: urls[0]))]
             }
         case .compressPDF:
-            runEach(urls, title: tool.title, symbol: tool.symbol) { url, _ in
-                [try PDFToolkit.compress(url: url)]
+            runEach(urls, title: tool.title, symbol: tool.symbol) { url, progress in
+                [try PDFToolkit.compress(url: url, progress: progress)]
             }
         case .muteVideo:
             runEach(urls, title: tool.title, symbol: tool.symbol) { url, progress in
@@ -464,8 +464,14 @@ final class AppRuntime {
             NSApp.activate()
             service.perform(withItems: urls)
         case .zip:
-            run(action.title, symbol: action.symbol, detail: L("\(urls.count) item(s)", "\(urls.count) öğe")) { _ in
-                [try ArchiveToolkit.zip(urls: urls, into: OutputLocation.directory(beside: urls[0]))]
+            if urls.allSatisfy({ Catalog.kind(for: $0) == .pdf }) {
+                runEach(urls, title: ToolID.compressPDF.windowTitle, symbol: ToolID.compressPDF.symbol) { url, progress in
+                    [try PDFToolkit.compress(url: url, progress: progress)]
+                }
+            } else {
+                run(action.title, symbol: action.symbol, detail: L("\(urls.count) item(s)", "\(urls.count) öğe")) { _ in
+                    [try ArchiveToolkit.zip(urls: urls, into: OutputLocation.directory(beside: urls[0]))]
+                }
             }
         case .duplicate:
             runEach(urls, title: action.title, symbol: action.symbol) { url, _ in

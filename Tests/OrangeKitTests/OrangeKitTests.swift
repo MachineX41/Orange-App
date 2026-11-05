@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import PDFKit
 import ImageIO
 import UniformTypeIdentifiers
 import XCTest
@@ -82,6 +83,61 @@ final class CropMathTests: XCTestCase {
     func testTopHalfMapsToUpperPixels() {
         let pixels = CropMath.pixelRect(normalizedTopLeft: CGRect(x: 0, y: 0, width: 1, height: 0.5), imageSize: CGSize(width: 200, height: 100))
         XCTAssertEqual(pixels, CGRect(x: 0, y: 50, width: 200, height: 50))
+    }
+}
+
+final class PDFCompressTests: XCTestCase {
+    func testHeavyPageShrinksWithoutLosingThePage() throws {
+        let directory = try makeTempDirectory()
+        let width = 1400
+        let height = 2000
+        var pixels = [UInt8](repeating: 255, count: width * height * 4)
+        var state: UInt32 = 0x12345678
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            state = state &* 1_664_525 &+ 1_013_904_223
+            pixels[index] = UInt8(truncatingIfNeeded: state >> 16)
+            pixels[index + 1] = UInt8(truncatingIfNeeded: state >> 8)
+            pixels[index + 2] = UInt8(truncatingIfNeeded: state)
+        }
+        let image = try pixels.withUnsafeBytes { raw -> CGImage in
+            let space = CGColorSpaceCreateDeviceRGB()
+            guard let provider = CGDataProvider(data: Data(raw) as CFData),
+                  let image = CGImage(
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bitsPerPixel: 32,
+                    bytesPerRow: width * 4,
+                    space: space,
+                    bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                    provider: provider,
+                    decode: nil,
+                    shouldInterpolate: true,
+                    intent: .defaultIntent
+                  ) else { throw OrangeError.writeFailed("image") }
+            return image
+        }
+        let source = directory.appendingPathComponent("scan.pdf")
+        var page = CGRect(x: 0, y: 0, width: 595, height: 842)
+        guard let consumer = CGDataConsumer(url: source as CFURL),
+              let context = CGContext(consumer: consumer, mediaBox: &page, nil) else {
+            throw OrangeError.writeFailed(source.lastPathComponent)
+        }
+        context.beginPDFPage(nil)
+        context.interpolationQuality = .none
+        context.draw(image, in: page)
+        context.endPDFPage()
+        context.closePDF()
+
+        let compressed = try PDFToolkit.compress(url: source)
+        let before = (try FileManager.default.attributesOfItem(atPath: source.path)[.size] as? NSNumber)?.intValue ?? 0
+        let after = (try FileManager.default.attributesOfItem(atPath: compressed.path)[.size] as? NSNumber)?.intValue ?? 0
+        XCTAssertGreaterThan(before, 1_000_000)
+        XCTAssertLessThan(after, before / 2)
+        XCTAssertEqual(try PDFToolkit.pageCount(of: compressed), 1)
+        let document = try XCTUnwrap(PDFDocument(url: compressed))
+        let preview = try XCTUnwrap(document.page(at: 0)?.thumbnail(of: CGSize(width: 40, height: 56), for: .mediaBox))
+        XCTAssertGreaterThan(preview.size.width, 10)
     }
 }
 

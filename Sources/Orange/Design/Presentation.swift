@@ -161,7 +161,7 @@ extension ToolID {
         case .mergePDF: L("Combine documents", "Belgeleri birleştir")
         case .splitPDF: L("Pages or ranges", "Sayfa ya da aralık")
         case .organizePDF: L("Reorder, rotate, delete", "Sırala, döndür, sil")
-        case .compressPDF: L("Optimize images inside", "İçteki görselleri optimize et")
+        case .compressPDF: L("Smaller file, pages stay sharp", "Daha küçük dosya, sayfalar net kalır")
         case .trimVideo: L("Keep the best part", "En iyi kısmı tut")
         case .cropVideo: L("Reframe the picture", "Kadrajı değiştir")
         case .compressVideo: L("HEVC presets", "HEVC ön ayarları")

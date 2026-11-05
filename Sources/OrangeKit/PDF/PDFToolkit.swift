@@ -119,26 +119,96 @@ public enum PDFToolkit {
         }
     }
 
-    public static func compress(url: URL) throws -> URL {
+    /// Rebuilds each page as a 200 DPI JPEG. Sharp enough to read and print, small enough for photo-heavy files.
+    public static func compress(url: URL, progress: ProgressHandler? = nil) throws -> URL {
         try locked {
             let source = try open(url)
+            let count = source.pageCount
+            guard count > 0 else { throw OrangeError.empty }
             let destination = UniqueDestination.url(
                 in: OutputLocation.directory(beside: url),
                 baseName: OutputLocation.baseName(url, suffix: Lang.t("Compressed", "Sıkıştırılmış")),
                 extension: "pdf"
             )
-            try write(source, to: destination, options: [
-                .saveImagesAsJPEGOption: true,
-                .optimizeImagesForScreenOption: true
-            ])
-            let before = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-            let after = (try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            guard let consumer = CGDataConsumer(url: destination as CFURL) else {
+                throw OrangeError.writeFailed(destination.lastPathComponent)
+            }
+            guard let first = source.page(at: 0) else { throw OrangeError.empty }
+            var firstBox = displayedBox(first)
+            guard let context = CGContext(consumer: consumer, mediaBox: &firstBox, nil) else {
+                throw OrangeError.writeFailed(destination.lastPathComponent)
+            }
+            context.interpolationQuality = .high
+
+            for index in 0..<count {
+                try autoreleasepool {
+                    guard let page = source.page(at: index) else { return }
+                    let box = displayedBox(page)
+                    let pixels = pixelSize(for: box)
+                    let rendered = try ImageEngine.render(width: pixels.width, height: pixels.height) { drawing in
+                        drawing.setFillColor(CGColor(gray: 1, alpha: 1))
+                        drawing.fill(CGRect(x: 0, y: 0, width: pixels.width, height: pixels.height))
+                        drawing.interpolationQuality = .high
+                        let scale = CGFloat(pixels.width) / max(box.width, 1)
+                        drawing.scaleBy(x: scale, y: scale)
+                        page.draw(with: .mediaBox, to: drawing)
+                    }
+                    let jpeg = try jpegImage(rendered, quality: 0.82)
+                    var pageBox = box
+                    let boxData = withUnsafeBytes(of: &pageBox) { Data($0) }
+                    context.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+                    context.draw(jpeg, in: pageBox)
+                    context.endPDFPage()
+                    progress?(Double(index + 1) / Double(count))
+                }
+            }
+            context.closePDF()
+
+            let before = byteCount(url)
+            let after = byteCount(destination)
             if before > 0, after >= before {
                 try? FileManager.default.removeItem(at: destination)
                 throw OrangeError.notSmaller
             }
             return destination
         }
+    }
+
+    /// The page as it appears, so a rotated scan keeps its upright size.
+    private static func displayedBox(_ page: PDFPage) -> CGRect {
+        let bounds = page.bounds(for: .mediaBox)
+        if page.rotation % 180 != 0 {
+            return CGRect(x: 0, y: 0, width: bounds.height, height: bounds.width)
+        }
+        return CGRect(x: 0, y: 0, width: bounds.width, height: bounds.height)
+    }
+
+    /// About 200 dots per inch, never larger than 3200 px on the long side.
+    private static func pixelSize(for box: CGRect) -> (width: Int, height: Int) {
+        let dpi: CGFloat = 200
+        var width = box.width * dpi / 72
+        var height = box.height * dpi / 72
+        let longest = max(width, height, 1)
+        if longest > 3200 {
+            let fit = 3200 / longest
+            width *= fit
+            height *= fit
+        }
+        return (max(Int(width.rounded()), 1), max(Int(height.rounded()), 1))
+    }
+
+    /// A JPEG-backed image, so the PDF stores it compressed instead of as raw pixels.
+    private static func jpegImage(_ image: CGImage, quality: Double) throws -> CGImage {
+        let data = try ImageEngine.encode(image, as: .jpeg, quality: quality)
+        guard let provider = CGDataProvider(data: data as CFData),
+              let jpeg = CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else {
+            throw OrangeError.writeFailed("JPEG")
+        }
+        return jpeg
+    }
+
+    private static func byteCount(_ url: URL) -> Int {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
     }
 
     // MARK: Rendering
