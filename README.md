@@ -9,7 +9,7 @@
 Mac için yerel, hızlı ve gizliliğe saygılı bir dosya stüdyosu.
 
 [![Son sürüm](https://img.shields.io/github/v/release/MachineX41/Orange-App?label=s%C3%BCr%C3%BCm&color=F26B1D)](https://github.com/MachineX41/Orange-App/releases/latest)
-[![İndirmeler](https://img.shields.io/github/downloads/MachineX41/Orange-App/total?label=indirme&color=F26B1D)](https://github.com/MachineX41/Orange-App/releases)
+[![DMG indirmeleri](https://img.shields.io/github/downloads/MachineX41/Orange-App/Orange.dmg?label=DMG%20indirme&color=F26B1D&displayAssetName=false)](https://github.com/MachineX41/Orange-App/releases)
 ![macOS](https://img.shields.io/badge/macOS-26%2B-111111?logo=apple)
 ![Swift](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
 [![Gizlilik](https://img.shields.io/badge/veri%20toplama-yok-34C759)](PRIVACY.md)
@@ -20,7 +20,13 @@ Mac için yerel, hızlı ve gizliliğe saygılı bir dosya stüdyosu.
 
 <br>
 
-<img src="docs/screenshots/home.png" width="860" alt="Orange ana sayfa">
+<a href="https://github.com/MachineX41/Orange-App/releases/latest/download/Orange-Demo.mp4">
+  <img src="docs/demo-cover.jpg" width="860" alt="Orange tanıtım videosu: dosyayı sürükleyin, tuşa basın ve çarka bırakın">
+</a>
+
+### [▶ Orange’ı 53 saniyede izleyin](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange-Demo.mp4)
+
+<sub>Gerçek uygulama arayüzü · 1080p · ses yok</sub>
 
 </div>
 
@@ -45,6 +51,10 @@ Mac için yerel, hızlı ve gizliliğe saygılı bir dosya stüdyosu.
 - **Bir hareketle iş biter.** Dosyayı sürüklerken bir tuşa basın, açılan çarkta bir dilime bırakın.
 - **Orijinale dokunmaz.** Her sonuç yeni bir kopya olarak orijinalin yanına kaydedilir.
 - **macOS’a ait hissettirir.** Liquid Glass arayüz, açık ve koyu tema, tam klavye desteği, Türkçe ve İngilizce.
+
+<p align="center">
+  <img src="docs/screenshots/home.png" width="860" alt="Orange ana sayfa">
+</p>
 
 ## Sürükleme çarkı
 
@@ -196,7 +206,9 @@ scripts/             build-app.sh, package.sh
 
 **Orange** is a native, privacy-first file studio for macOS 26+. Start dragging any file and hold `⇧` (Convert), `⌘` (Tools) or `⌃` (Actions): a Liquid Glass wheel opens under the pointer, and dropping on a slice writes a new copy next to the original. Everything runs on your Mac with no accounts, analytics or uploads.
 
-[**Download Orange.dmg**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange.dmg) (Apple silicon). Builds are not notarized yet; on first launch, open **System Settings › Privacy & Security** and click **Open Anyway**. Optional: `brew install yt-dlp` for downloading from video sites. See the [Privacy Notice](PRIVACY.md) and [Terms of Use](TERMS.md).
+[**Watch the 53-second demo**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange-Demo.mp4) · [**Download Orange.dmg**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange.dmg)
+
+Apple silicon only. Builds are not notarized yet; on first launch, open **System Settings › Privacy & Security** and click **Open Anyway**. Optional: `brew install yt-dlp` for downloading from video sites. See the [Privacy Notice](PRIVACY.md) and [Terms of Use](TERMS.md).
 
 ---
 
