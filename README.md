@@ -20,11 +20,11 @@ Mac için yerel, hızlı ve gizliliğe saygılı bir dosya stüdyosu.
 
 <br>
 
-<a href="https://github.com/MachineX41/Orange-App/releases/latest/download/Orange-Demo.mp4">
+<a href="docs/Orange-Demo.mp4?raw=1">
   <img src="docs/demo-cover.jpg" width="860" alt="Orange tanıtım videosu: dosyayı sürükleyin, tuşa basın ve çarka bırakın">
 </a>
 
-### [▶ Orange’ı 53 saniyede izleyin](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange-Demo.mp4)
+### [▶ Orange’ı 53 saniyede izleyin](docs/Orange-Demo.mp4?raw=1)
 
 <sub>Gerçek uygulama arayüzü · 1080p · ses yok</sub>
 
@@ -206,7 +206,7 @@ scripts/             build-app.sh, package.sh
 
 **Orange** is a native, privacy-first file studio for macOS 26+. Start dragging any file and hold `⇧` (Convert), `⌘` (Tools) or `⌃` (Actions): a Liquid Glass wheel opens under the pointer, and dropping on a slice writes a new copy next to the original. Everything runs on your Mac with no accounts, analytics or uploads.
 
-[**Watch the 53-second demo**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange-Demo.mp4) · [**Download Orange.dmg**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange.dmg)
+[**Watch the 53-second demo**](docs/Orange-Demo.mp4?raw=1) · [**Download Orange.dmg**](https://github.com/MachineX41/Orange-App/releases/latest/download/Orange.dmg)
 
 Apple silicon only. Builds are not notarized yet; on first launch, open **System Settings › Privacy & Security** and click **Open Anyway**. Optional: `brew install yt-dlp` for downloading from video sites. See the [Privacy Notice](PRIVACY.md) and [Terms of Use](TERMS.md).
 
