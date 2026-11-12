@@ -13,6 +13,133 @@ func makeTempDirectory() throws -> URL {
     return directory
 }
 
+func sample(_ rep: NSBitmapImageRep, x: CGFloat, y: CGFloat, bounds: CGRect) -> (red: Int, green: Int, blue: Int) {
+    let px = min(max(Int(x / bounds.width * CGFloat(rep.pixelsWide)), 0), max(rep.pixelsWide - 1, 0))
+    let py = min(max(Int(y / bounds.height * CGFloat(rep.pixelsHigh)), 0), max(rep.pixelsHigh - 1, 0))
+    let color = rep.colorAt(x: px, y: py)?.usingColorSpace(.sRGB) ?? .clear
+    return (Int(color.redComponent * 255), Int(color.greenComponent * 255), Int(color.blueComponent * 255))
+}
+
+func makeDeck(in directory: URL) throws -> URL {
+    let root = directory.appendingPathComponent("deck", isDirectory: true)
+    for folder in ["ppt/_rels", "ppt/slides/_rels", "ppt/slides", "ppt/media", "ppt/theme"] {
+        try FileManager.default.createDirectory(at: root.appendingPathComponent(folder), withIntermediateDirectories: true)
+    }
+    try """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <p:sldIdLst>
+        <p:sldId id="256" r:id="rId1"/>
+        <p:sldId id="257" r:id="rId2"/>
+      </p:sldIdLst>
+      <p:sldSz cx="12192000" cy="6858000"/>
+    </p:presentation>
+    """.write(to: root.appendingPathComponent("ppt/presentation.xml"), atomically: true, encoding: .utf8)
+    try """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+      <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/>
+    </Relationships>
+    """.write(to: root.appendingPathComponent("ppt/_rels/presentation.xml.rels"), atomically: true, encoding: .utf8)
+    try """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <p:cSld>
+        <p:spTree>
+          <p:sp>
+            <p:spPr>
+              <a:xfrm><a:off x="1270000" y="1270000"/><a:ext cx="2540000" cy="1270000"/></a:xfrm>
+              <a:prstGeom prst="rect"/>
+              <a:solidFill><a:srgbClr val="F26B1D"/></a:solidFill>
+            </p:spPr>
+          </p:sp>
+          <p:pic>
+            <p:blipFill><a:blip r:embed="rId1"/></p:blipFill>
+            <p:spPr>
+              <a:xfrm><a:off x="5080000" y="400000"/><a:ext cx="1270000" cy="1270000"/></a:xfrm>
+            </p:spPr>
+          </p:pic>
+          <p:sp>
+            <p:spPr>
+              <a:xfrm><a:off x="1270000" y="3000000"/><a:ext cx="8000000" cy="1400000"/></a:xfrm>
+            </p:spPr>
+            <p:txBody>
+              <a:bodyPr/>
+              <a:p><a:r><a:rPr sz="3200" b="1"><a:solidFill><a:srgbClr val="112233"/></a:solidFill></a:rPr><a:t>Orange slide</a:t></a:r></a:p>
+            </p:txBody>
+          </p:sp>
+        </p:spTree>
+      </p:cSld>
+    </p:sld>
+    """.write(to: root.appendingPathComponent("ppt/slides/slide1.xml"), atomically: true, encoding: .utf8)
+    try """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/pixel.png"/>
+    </Relationships>
+    """.write(to: root.appendingPathComponent("ppt/slides/_rels/slide1.xml.rels"), atomically: true, encoding: .utf8)
+    try """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <p:cSld>
+        <p:spTree>
+          <p:grpSp>
+            <p:grpSpPr>
+              <a:xfrm>
+                <a:off x="457200" y="457200"/>
+                <a:ext cx="8000000" cy="2000000"/>
+                <a:chOff x="0" y="0"/>
+                <a:chExt cx="8000000" cy="2000000"/>
+              </a:xfrm>
+            </p:grpSpPr>
+            <p:sp>
+              <p:spPr>
+                <a:xfrm><a:off x="0" y="0"/><a:ext cx="7000000" cy="1200000"/></a:xfrm>
+                <a:solidFill><a:schemeClr val="accent1"><a:lumMod val="80000"/></a:schemeClr></a:solidFill>
+              </p:spPr>
+              <p:txBody>
+                <a:bodyPr/>
+                <a:p><a:r><a:rPr sz="2400"/><a:t>Grouped line</a:t></a:r></a:p>
+              </p:txBody>
+            </p:sp>
+          </p:grpSp>
+        </p:spTree>
+      </p:cSld>
+    </p:sld>
+    """.write(to: root.appendingPathComponent("ppt/slides/slide2.xml"), atomically: true, encoding: .utf8)
+    try """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:themeElements>
+        <a:clrScheme name="Orange">
+          <a:dk1><a:srgbClr val="111111"/></a:dk1>
+          <a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+          <a:accent1><a:srgbClr val="F26B1D"/></a:accent1>
+        </a:clrScheme>
+        <a:fontScheme name="Office">
+          <a:majorFont><a:latin typeface="Helvetica"/></a:majorFont>
+          <a:minorFont><a:latin typeface="Helvetica"/></a:minorFont>
+        </a:fontScheme>
+      </a:themeElements>
+    </a:theme>
+    """.write(to: root.appendingPathComponent("ppt/theme/theme1.xml"), atomically: true, encoding: .utf8)
+    try ImageEngine.write(try makeSwatch(width: 8, height: 8), to: root.appendingPathComponent("ppt/media/pixel.png"), as: .png, quality: 1)
+
+    let deck = directory.appendingPathComponent("deck.pptx")
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+    process.arguments = ["-c", "-k", "--norsrc", root.path, deck.path]
+    let error = Pipe()
+    process.standardError = error
+    process.standardOutput = Pipe()
+    try process.run()
+    process.waitUntilExit()
+    let message = String(decoding: error.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    if process.terminationStatus != 0 { throw OrangeError.toolFailed(message) }
+    return deck
+}
+
 func makeSwatch(width: Int, height: Int) throws -> CGImage {
     try ImageEngine.render(width: width, height: height) { context in
         context.setFillColor(CGColor(srgbRed: 0.9, green: 0.3, blue: 0.1, alpha: 1))
@@ -30,6 +157,8 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.pdf")), .pdf)
         XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.zip")), .archive)
         XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.docx")), .document)
+        XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.pptx")), .document)
+        XCTAssertEqual(Catalog.convertTargets(for: URL(fileURLWithPath: "/tmp/a.pptx")), [.pdf])
     }
 
     func testTargetsExcludeOwnFormat() {
@@ -234,6 +363,37 @@ final class DocumentAndPDFTests: XCTestCase {
         XCTAssertEqual(parts.count, 2)
         let images = try PDFToolkit.toImages(url: pdf, format: .png)
         XCTAssertEqual(images.first?.pathExtension, "png")
+    }
+
+    func testPowerPointBecomesPDF() throws {
+        let directory = try makeTempDirectory()
+        let deck = try makeDeck(in: directory)
+        let pdf = try PresentationConverter.convert(deck)
+        XCTAssertEqual(pdf.pathExtension, "pdf")
+        XCTAssertEqual(try PDFToolkit.pageCount(of: pdf), 2)
+        let text = try PDFToolkit.text(of: pdf)
+        XCTAssertTrue(text.contains("Orange slide"))
+        XCTAssertTrue(text.contains("Grouped line"))
+
+        let document = try XCTUnwrap(PDFDocument(url: pdf))
+        let page = try XCTUnwrap(document.page(at: 0))
+        let bounds = page.bounds(for: .mediaBox)
+        XCTAssertEqual(bounds.width, 960, accuracy: 0.2)
+        XCTAssertEqual(bounds.height, 540, accuracy: 0.2)
+
+        let thumb = page.thumbnail(of: NSSize(width: bounds.width, height: bounds.height), for: .mediaBox)
+        let rep = try XCTUnwrap(thumb.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+        let shape = sample(rep, x: 200, y: 150, bounds: bounds)
+        XCTAssertGreaterThan(shape.red, 200, "shape \(shape)")
+        XCTAssertLessThan(shape.blue, 80, "shape \(shape)")
+
+        let source = try XCTUnwrap(NSImage(contentsOf: directory.appendingPathComponent("deck/ppt/media/pixel.png")))
+        let sourceRep = try XCTUnwrap(source.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+        let sourceTop = sample(sourceRep, x: 4, y: 1, bounds: CGRect(x: 0, y: 0, width: 8, height: 8))
+        let photo = sample(rep, x: 430, y: 50, bounds: bounds)
+        XCTAssertLessThan(abs(photo.red - sourceTop.red), 30, "photo \(photo) source \(sourceTop)")
+        XCTAssertLessThan(abs(photo.green - sourceTop.green), 30, "photo \(photo) source \(sourceTop)")
+        XCTAssertLessThan(abs(photo.blue - sourceTop.blue), 30, "photo \(photo) source \(sourceTop)")
     }
 
     func testMediaLinkDiscovery() {

@@ -115,9 +115,14 @@ public enum ToolID: String, Codable, Sendable, CaseIterable, Identifiable {
 }
 
 public enum Catalog {
-    static let documentExtensions: Set<String> = [
+    static let presentationExtensions: Set<String> = ["pptx", "pptm", "ppsx", "ppsm", "potx", "potm"]
+    static let documentExtensions: Set<String> = Set([
         "txt", "text", "md", "markdown", "rtf", "doc", "docx", "odt", "html", "htm", "webarchive"
-    ]
+    ]).union(presentationExtensions)
+
+    public static func isPresentation(_ url: URL) -> Bool {
+        presentationExtensions.contains(canonicalExtension(url.pathExtension))
+    }
     static let archiveExtensions: Set<String> = [
         "zip", "tar", "tgz", "gz", "bz2", "tbz", "tbz2", "xz", "txz", "7z", "rar"
     ]
@@ -160,7 +165,7 @@ public enum Catalog {
         case .pdf:
             list = [.png, .jpeg, .webp, .txt, .docx, .rtf]
         case .document:
-            list = [.pdf, .docx, .rtf, .html, .odt, .txt]
+            list = isPresentation(url) ? [.pdf] : [.pdf, .docx, .rtf, .html, .odt, .txt]
         case .archive, .other:
             list = []
         }

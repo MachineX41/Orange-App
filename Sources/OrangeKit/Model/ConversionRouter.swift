@@ -26,6 +26,10 @@ public enum ConversionRouter {
                 return [try DocumentConverter.convert(url, to: target)]
             }
         case .document:
+            if Catalog.isPresentation(url) {
+                guard target == .pdf else { throw OrangeError.unsupported(target.rawValue.uppercased()) }
+                return [try PresentationConverter.convert(url)]
+            }
             return [try DocumentConverter.convert(url, to: target)]
         case .archive, .other:
             throw OrangeError.unsupported(url.pathExtension.uppercased())

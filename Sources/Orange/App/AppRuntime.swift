@@ -179,7 +179,15 @@ final class AppRuntime {
         case .video: [.movie, .video]
         case .audio: [.audio]
         case .pdf: [.pdf]
-        case .document: [.plainText, .rtf, .html, UTType("org.openxmlformats.wordprocessingml.document"), UTType("org.oasis-open.opendocument.text")].compactMap { $0 }
+        case .document: [
+            .plainText, .rtf, .html,
+            UTType("org.openxmlformats.wordprocessingml.document"),
+            UTType("org.oasis-open.opendocument.text"),
+            UTType("org.openxmlformats.presentationml.presentation"),
+            UTType("org.openxmlformats.presentationml.slideshow"),
+            UTType("org.openxmlformats.presentationml.template"),
+            UTType("org.openxmlformats.presentationml.presentation.macroenabled")
+        ].compactMap { $0 }
         case .archive: [.archive, .zip]
         case .other: [.data]
         }

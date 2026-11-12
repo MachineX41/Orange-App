@@ -64,7 +64,7 @@ Finder’dan, masaüstünden veya herhangi bir uygulamadan bir dosyayı sürükl
 
 | Tuş | Çark | Ne yapar |
 | --- | --- | --- |
-| `⇧` Shift | **Dönüştür** | Biçim değiştirir (HEIC → JPG, MOV → MP4, DOCX → PDF…) |
+| `⇧` Shift | **Dönüştür** | Biçim değiştirir (HEIC → JPG, MOV → MP4, DOCX → PDF, PPTX → PDF…) |
 | `⌘` Command | **Araçlar** | Kırp, sıkıştır, kes, gizle; odaklı bir editörde açar |
 | `⌃` Control | **Eylemler** | Raf, kopyala, taşı, AirDrop, sıkıştır, Terminal’de aç |
 
@@ -81,7 +81,7 @@ Sürüklerken tuşu değiştirirseniz çark yerinde kalır, yalnızca içeriği 
 | Tür | Biçimler |
 | --- | --- |
 | Görsel | JPG, PNG, HEIC, WEBP, AVIF, TIFF, BMP, GIF, PDF |
-| Belge | PDF, TXT, DOCX, RTF, HTML, ODT; Markdown girişi |
+| Belge | PDF, TXT, DOCX, RTF, HTML, ODT, PPTX; Markdown girişi |
 | Video | MP4, MOV, M4V, GIF |
 | Ses | M4A, WAV, AIFF; videodan ses çıkarma |
 
