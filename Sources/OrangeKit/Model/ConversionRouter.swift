@@ -27,8 +27,16 @@ public enum ConversionRouter {
             }
         case .document:
             if Catalog.isPresentation(url) {
-                guard target == .pdf else { throw OrangeError.unsupported(target.rawValue.uppercased()) }
-                return [try PresentationConverter.convert(url)]
+                switch target {
+                case .pdf:
+                    return [try PresentationConverter.convert(url)]
+                case .txt:
+                    let text = try PresentationConverter.outline(url)
+                    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw OrangeError.nothingFound }
+                    return [try writeText(text, beside: url)]
+                default:
+                    throw OrangeError.unsupported(target.rawValue.uppercased())
+                }
             }
             return [try DocumentConverter.convert(url, to: target)]
         case .archive, .other:

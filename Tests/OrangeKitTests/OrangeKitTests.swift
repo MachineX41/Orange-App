@@ -158,7 +158,7 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.zip")), .archive)
         XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.docx")), .document)
         XCTAssertEqual(Catalog.kind(for: URL(fileURLWithPath: "/tmp/a.pptx")), .document)
-        XCTAssertEqual(Catalog.convertTargets(for: URL(fileURLWithPath: "/tmp/a.pptx")), [.pdf])
+        XCTAssertEqual(Catalog.convertTargets(for: URL(fileURLWithPath: "/tmp/a.pptx")), [.pdf, .txt])
     }
 
     func testTargetsExcludeOwnFormat() {
@@ -365,7 +365,7 @@ final class DocumentAndPDFTests: XCTestCase {
         XCTAssertEqual(images.first?.pathExtension, "png")
     }
 
-    func testPowerPointBecomesPDF() throws {
+    func testPowerPointBecomesPDF() async throws {
         let directory = try makeTempDirectory()
         let deck = try makeDeck(in: directory)
         let pdf = try PresentationConverter.convert(deck)
@@ -394,6 +394,13 @@ final class DocumentAndPDFTests: XCTestCase {
         XCTAssertLessThan(abs(photo.red - sourceTop.red), 30, "photo \(photo) source \(sourceTop)")
         XCTAssertLessThan(abs(photo.green - sourceTop.green), 30, "photo \(photo) source \(sourceTop)")
         XCTAssertLessThan(abs(photo.blue - sourceTop.blue), 30, "photo \(photo) source \(sourceTop)")
+
+        let outline = try PresentationConverter.outline(deck)
+        XCTAssertTrue(outline.contains("Orange slide"))
+        XCTAssertTrue(outline.contains("Grouped line"))
+        let textCopy = try await ConversionRouter.convert(deck, to: .txt)
+        XCTAssertEqual(textCopy.first?.pathExtension, "txt")
+        XCTAssertTrue(try String(contentsOf: textCopy[0], encoding: .utf8).contains("Orange slide"))
     }
 
     func testMediaLinkDiscovery() {

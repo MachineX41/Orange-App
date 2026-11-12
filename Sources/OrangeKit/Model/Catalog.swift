@@ -165,7 +165,7 @@ public enum Catalog {
         case .pdf:
             list = [.png, .jpeg, .webp, .txt, .docx, .rtf]
         case .document:
-            list = isPresentation(url) ? [.pdf] : [.pdf, .docx, .rtf, .html, .odt, .txt]
+            list = isPresentation(url) ? [.pdf, .txt] : [.pdf, .docx, .rtf, .html, .odt, .txt]
         case .archive, .other:
             list = []
         }

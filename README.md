@@ -81,7 +81,7 @@ Sürüklerken tuşu değiştirirseniz çark yerinde kalır, yalnızca içeriği 
 | Tür | Biçimler |
 | --- | --- |
 | Görsel | JPG, PNG, HEIC, WEBP, AVIF, TIFF, BMP, GIF, PDF |
-| Belge | PDF, TXT, DOCX, RTF, HTML, ODT, PPTX; Markdown girişi |
+| Belge | PDF, TXT, DOCX, RTF, HTML, ODT, PPTX → PDF/TXT; Markdown girişi |
 | Video | MP4, MOV, M4V, GIF |
 | Ses | M4A, WAV, AIFF; videodan ses çıkarma |
 
