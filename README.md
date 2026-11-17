@@ -122,6 +122,14 @@ Sürüklerken tuşu değiştirirseniz çark yerinde kalır, yalnızca içeriği 
 
 **Gereksinimler:** macOS 26 Tahoe veya üzeri, Apple silicon (M serisi) Mac.
 
+Windows ve Linux için ayrı istemci `desktop/` altındadır. .NET 8 ile derlenir; çark, dönüştürme ve düzenleyiciler aynı kuralları kullanır. Paketler GitHub Releases’a eklenmez, `desktop/scripts/package.sh` ile yerelde ve Desktop iş akışının yapıtları olarak üretilir.
+
+```bash
+cd desktop
+dotnet test
+./scripts/package.sh
+```
+
 **İsteğe bağlı, video sitelerinden indirme:** YouTube, Instagram, X ve benzeri sitelerden indirmek için ücretsiz ve açık kaynak [yt‑dlp](https://github.com/yt-dlp/yt-dlp) gerekir:
 
 ```bash

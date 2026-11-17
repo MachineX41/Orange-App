@@ -1,0 +1,83 @@
+name: Desktop
+
+on:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Test
+        working-directory: desktop
+        run: dotnet test
+
+  package:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            archive: zip
+          - os: ubuntu-latest
+            rid: linux-x64
+            archive: tar
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish
+        working-directory: desktop
+        run: dotnet publish src/Orange.App/Orange.App.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o ../build/desktop/${{ matrix.rid }}
+      - name: Bundle FFmpeg
+        shell: bash
+        run: |
+          rid="${{ matrix.rid }}"
+          dest="build/desktop/$rid"
+          mkdir -p "$dest/models" "$RUNNER_TEMP/ff"
+          curl -fsSL -o "$dest/models/haarcascade_frontalface_default.xml" https://raw.githubusercontent.com/opencv/opencv/4.10.0/data/haarcascades/haarcascade_frontalface_default.xml
+          if [ "$rid" = "win-x64" ]; then
+            curl -fL -o "$RUNNER_TEMP/ff/pkg.zip" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+            unzip -q "$RUNNER_TEMP/ff/pkg.zip" -d "$RUNNER_TEMP/ff/out"
+          else
+            curl -fL -o "$RUNNER_TEMP/ff/pkg.tar.xz" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+            mkdir -p "$RUNNER_TEMP/ff/out"
+            tar -xJf "$RUNNER_TEMP/ff/pkg.tar.xz" -C "$RUNNER_TEMP/ff/out"
+          fi
+          find "$RUNNER_TEMP/ff/out" -type f \( -name 'ffmpeg' -o -name 'ffmpeg.exe' -o -name 'ffprobe' -o -name 'ffprobe.exe' -o -name 'ffplay' -o -name 'ffplay.exe' \) -exec cp {} "$dest/" \;
+      - name: Archive
+        run: |
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            cd build/desktop && powershell Compress-Archive -Path win-x64 -DestinationPath Orange-windows-x64.zip
+          else
+            mkdir -p build/desktop/Orange.AppDir/usr/bin
+            cp -a build/desktop/linux-x64/. build/desktop/Orange.AppDir/usr/bin/
+            printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/bin/Orange" "$@"\n' > build/desktop/Orange.AppDir/AppRun
+            chmod +x build/desktop/Orange.AppDir/AppRun
+            cp Configuration/AppIcon.png build/desktop/Orange.AppDir/orange.png
+            printf '%s\n' '[Desktop Entry]' 'Name=Orange' 'Exec=Orange' 'Icon=orange' 'Type=Application' 'Categories=Utility;' > build/desktop/Orange.AppDir/orange.desktop
+            if curl -fsSL -o /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage; then
+              chmod +x /tmp/appimagetool
+              ARCH=x86_64 /tmp/appimagetool --appimage-extract-and-run build/desktop/Orange.AppDir build/desktop/Orange-linux-x64.AppImage || true
+            fi
+            tar -C build/desktop -czf build/desktop/Orange-linux-x64.tar.gz Orange.AppDir
+          fi
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orange-${{ matrix.rid }}
+          if-no-files-found: ignore
+          path: |
+            build/desktop/Orange-windows-x64.zip
+            build/desktop/Orange-linux-x64.tar.gz
+            build/desktop/Orange-linux-x64.AppImage

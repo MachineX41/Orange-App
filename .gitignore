@@ -5,3 +5,6 @@ DerivedData/
 .swiftpm/
 *.xcuserstate
 xcuserdata/
+desktop/**/bin/
+desktop/**/obj/
+desktop/dist/

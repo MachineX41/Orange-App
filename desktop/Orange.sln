@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C471F5E4-14E4-4BCF-877C-C309A4525E9F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orange.Core", "src\Orange.Core\Orange.Core.csproj", "{202DDA5C-20CE-4944-8EBC-852834BBE96B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orange.Engines", "src\Orange.Engines\Orange.Engines.csproj", "{7DB01526-EF63-4DC0-BC44-3F96941CEC14}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orange.App", "src\Orange.App\Orange.App.csproj", "{801A6CF2-2675-489A-9FA9-18FC4A20DDC3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{D50AB071-508B-472F-A97C-164469322C4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orange.Core.Tests", "tests\Orange.Core.Tests\Orange.Core.Tests.csproj", "{6BE77A5E-AAC9-4D2D-ADC9-29321B4F214B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orange.Engines.Tests", "tests\Orange.Engines.Tests\Orange.Engines.Tests.csproj", "{06CF6394-C614-44A7-8F22-0FD9CD9D85DA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{202DDA5C-20CE-4944-8EBC-852834BBE96B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{202DDA5C-20CE-4944-8EBC-852834BBE96B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{202DDA5C-20CE-4944-8EBC-852834BBE96B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{202DDA5C-20CE-4944-8EBC-852834BBE96B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7DB01526-EF63-4DC0-BC44-3F96941CEC14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7DB01526-EF63-4DC0-BC44-3F96941CEC14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7DB01526-EF63-4DC0-BC44-3F96941CEC14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7DB01526-EF63-4DC0-BC44-3F96941CEC14}.Release|Any CPU.Build.0 = Release|Any CPU
+		{801A6CF2-2675-489A-9FA9-18FC4A20DDC3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{801A6CF2-2675-489A-9FA9-18FC4A20DDC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{801A6CF2-2675-489A-9FA9-18FC4A20DDC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{801A6CF2-2675-489A-9FA9-18FC4A20DDC3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6BE77A5E-AAC9-4D2D-ADC9-29321B4F214B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6BE77A5E-AAC9-4D2D-ADC9-29321B4F214B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6BE77A5E-AAC9-4D2D-ADC9-29321B4F214B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6BE77A5E-AAC9-4D2D-ADC9-29321B4F214B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06CF6394-C614-44A7-8F22-0FD9CD9D85DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06CF6394-C614-44A7-8F22-0FD9CD9D85DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06CF6394-C614-44A7-8F22-0FD9CD9D85DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06CF6394-C614-44A7-8F22-0FD9CD9D85DA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{202DDA5C-20CE-4944-8EBC-852834BBE96B} = {C471F5E4-14E4-4BCF-877C-C309A4525E9F}
+		{7DB01526-EF63-4DC0-BC44-3F96941CEC14} = {C471F5E4-14E4-4BCF-877C-C309A4525E9F}
+		{801A6CF2-2675-489A-9FA9-18FC4A20DDC3} = {C471F5E4-14E4-4BCF-877C-C309A4525E9F}
+		{6BE77A5E-AAC9-4D2D-ADC9-29321B4F214B} = {D50AB071-508B-472F-A97C-164469322C4A}
+		{06CF6394-C614-44A7-8F22-0FD9CD9D85DA} = {D50AB071-508B-472F-A97C-164469322C4A}
+	EndGlobalSection
+EndGlobal
