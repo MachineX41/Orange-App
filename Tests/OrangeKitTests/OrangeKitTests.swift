@@ -533,6 +533,54 @@ final class DownloadProgressTests: XCTestCase {
         XCTAssertEqual(finished.paths, ["/tmp/clip.mp4"])
     }
 
+    func testProcessExitUnblocksAfterThePipesClose() async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/echo")
+        process.arguments = ["done"]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+        output.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil }
+        }
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await LinkDownloader.launchAndWait(process) }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                throw OrangeError.toolFailed("timed out")
+            }
+            try await group.next()
+            group.cancelAll()
+        }
+        XCTAssertFalse(process.isRunning)
+        XCTAssertEqual(process.terminationStatus, 0)
+    }
+
+    func testYouTubeDownloadImpersonatesChrome() {
+        let directory = URL(fileURLWithPath: "/tmp")
+        let youtube = URL(string: "https://www.youtube.com/watch?v=jNQXAC9IVRw")!
+        let short = URL(string: "https://youtu.be/jNQXAC9IVRw")!
+        let other = URL(string: "https://vimeo.com/1")!
+        XCTAssertTrue(LinkDownloader.isYouTube(youtube))
+        XCTAssertTrue(LinkDownloader.isYouTube(short))
+        XCTAssertTrue(LinkDownloader.isYouTube(URL(string: "https://music.youtube.com/watch?v=abc")!))
+        XCTAssertFalse(LinkDownloader.isYouTube(other))
+
+        let youtubeArgs = LinkDownloader.downloaderArguments(url: youtube, audioOnly: false, directory: directory, impersonateChrome: true)
+        let impersonateAt = youtubeArgs.firstIndex(of: "--impersonate")
+        XCTAssertEqual(impersonateAt.map { youtubeArgs[$0 + 1] }, "chrome")
+        XCTAssertTrue(youtubeArgs.contains("--retries"))
+        XCTAssertEqual(youtubeArgs.last, youtube.absoluteString)
+
+        let plain = LinkDownloader.downloaderArguments(url: youtube, audioOnly: true, directory: directory, impersonateChrome: false)
+        XCTAssertFalse(plain.contains("--impersonate"))
+        XCTAssertTrue(plain.contains("-x"))
+
+        let vimeo = LinkDownloader.downloaderArguments(url: other, audioOnly: false, directory: directory, impersonateChrome: true)
+        XCTAssertFalse(vimeo.contains("--impersonate"))
+    }
+
     func testSecondFileContinuesTheRing() {
         var reader = LinkDownloader.DownloadProgressReader()
         let values = reader.feed("ORANGEPROG:100\nORANGEPROG:0.3\nORANGEPROG:50\n")
