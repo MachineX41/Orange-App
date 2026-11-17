@@ -44,19 +44,34 @@ public static class Ffmpeg
 
     public static async Task<(double Duration, int Width, int Height, bool Audio)> ProbeAsync(string path, CancellationToken cancellation)
     {
-        var tool = Locate("ffprobe");
+        var tool = Locate("ffprobe") ?? Locate("ffmpeg");
         if (tool is null) return (0, 0, 0, true);
+        var ffmpegProbe = Path.GetFileName(tool).StartsWith("ffmpeg", StringComparison.OrdinalIgnoreCase);
         var start = new ProcessStartInfo(tool)
         {
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        foreach (var argument in new[] { "-v", "error", "-show_entries", "format=duration:stream=width,height,codec_type", "-of", "default=nw=1", path })
-            start.ArgumentList.Add(argument);
+        if (ffmpegProbe)
+        {
+            start.RedirectStandardError = true;
+            start.ArgumentList.Add("-hide_banner");
+            start.ArgumentList.Add("-i");
+            start.ArgumentList.Add(path);
+        }
+        else
+        {
+            foreach (var argument in new[] { "-v", "error", "-show_entries", "format=duration:stream=width,height,codec_type", "-of", "default=nw=1", path })
+                start.ArgumentList.Add(argument);
+        }
         using var process = Process.Start(start);
         if (process is null) return (0, 0, 0, true);
-        var text = await process.StandardOutput.ReadToEndAsync(cancellation);
+        var stdout = process.StandardOutput.ReadToEndAsync(cancellation);
+        var text = ffmpegProbe
+            ? await process.StandardError.ReadToEndAsync(cancellation)
+            : await stdout;
+        if (ffmpegProbe) await stdout;
         await process.WaitForExitAsync(cancellation);
         double duration = 0;
         var width = 0;
@@ -70,6 +85,19 @@ public static class Ffmpeg
             if (pair[0] == "width") int.TryParse(pair[1], out width);
             if (pair[0] == "height") int.TryParse(pair[1], out height);
             if (pair[0] == "codec_type" && pair[1].Trim() == "audio") audio = true;
+        }
+        if (ffmpegProbe)
+        {
+            var durationMatch = System.Text.RegularExpressions.Regex.Match(text, @"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)");
+            if (durationMatch.Success)
+                duration = int.Parse(durationMatch.Groups[1].Value) * 3600 + int.Parse(durationMatch.Groups[2].Value) * 60 + double.Parse(durationMatch.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var videoMatch = System.Text.RegularExpressions.Regex.Match(text, @"Video:.*? (\d{2,5})x(\d{2,5})");
+            if (videoMatch.Success)
+            {
+                int.TryParse(videoMatch.Groups[1].Value, out width);
+                int.TryParse(videoMatch.Groups[2].Value, out height);
+            }
+            audio = text.Contains("Audio:", StringComparison.Ordinal);
         }
         return (duration, width, height, audio);
     }

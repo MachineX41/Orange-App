@@ -20,6 +20,8 @@ public class MainWindow : Window
         Height = 720;
         MinWidth = 860;
         MinHeight = 560;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        ShowInTaskbar = true;
         Background = Brush(Session.Current.Appearance);
         drag = new DragWatcher(this);
         Content = BuildShell();

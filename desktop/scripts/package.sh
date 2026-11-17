@@ -20,7 +20,7 @@ fetch_ffmpeg() {
     mkdir -p "$tmp/out"
     tar -xJf "$tmp/ffmpeg.pkg" -C "$tmp/out"
   fi
-  find "$tmp/out" -type f \( -name 'ffmpeg' -o -name 'ffmpeg.exe' -o -name 'ffprobe' -o -name 'ffprobe.exe' -o -name 'ffplay' -o -name 'ffplay.exe' \) -exec cp {} "$dest/" \;
+  find "$tmp/out" -type f \( -name 'ffmpeg' -o -name 'ffmpeg.exe' \) -exec cp {} "$dest/" \;
   chmod +x "$dest"/ffmpeg "$dest"/ffprobe "$dest"/ffplay 2>/dev/null || true
   rm -rf "$tmp"
 }

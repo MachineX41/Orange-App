@@ -17,7 +17,8 @@ public class App : Application
         {
             desktop.MainWindow = new MainWindow();
             desktop.Exit += (_, _) => Session.Current.Save();
-            AddTray(desktop);
+            try { AddTray(desktop); }
+            catch { /* The window remains usable when the tray cannot be created. */ }
         }
         base.OnFrameworkInitializationCompleted();
     }

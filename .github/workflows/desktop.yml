@@ -54,11 +54,20 @@ jobs:
             mkdir -p "$RUNNER_TEMP/ff/out"
             tar -xJf "$RUNNER_TEMP/ff/pkg.tar.xz" -C "$RUNNER_TEMP/ff/out"
           fi
-          find "$RUNNER_TEMP/ff/out" -type f \( -name 'ffmpeg' -o -name 'ffmpeg.exe' -o -name 'ffprobe' -o -name 'ffprobe.exe' -o -name 'ffplay' -o -name 'ffplay.exe' \) -exec cp {} "$dest/" \;
+          find "$RUNNER_TEMP/ff/out" -type f \( -name 'ffmpeg' -o -name 'ffmpeg.exe' \) -exec cp {} "$dest/" \;
+          if [ "$rid" = "win-x64" ]; then
+            cat > "$dest/OKU.txt" <<'EOF'
+Orange'ı zip penceresinin içinden çalıştırmayın. Zipin tamamını bir klasöre çıkarın, sonra o klasördeki Orange.exe dosyasına çift tıklayın.
+
+Windows tanımadığı uygulamayı keser. Orange.exe üzerinde sağ tık, Özellikler, altta Engellemeyi kaldır varsa işaretleyin. Tekrar açınca Daha fazla bilgi ve Yine de çalıştır deyin.
+
+Yönetici olarak açmayın. Pencere gelmezse aynı klasördeki startup.log dosyasına bakın.
+EOF
+          fi
       - name: Archive
         run: |
           if [ "${{ matrix.archive }}" = "zip" ]; then
-            cd build/desktop && powershell Compress-Archive -Path win-x64 -DestinationPath Orange-windows-x64.zip
+            echo "Windows files stay as a single folder so one download extracts Orange.exe beside its libraries."
           else
             mkdir -p build/desktop/Orange.AppDir/usr/bin
             cp -a build/desktop/linux-x64/. build/desktop/Orange.AppDir/usr/bin/
@@ -70,7 +79,9 @@ jobs:
               chmod +x /tmp/appimagetool
               ARCH=x86_64 /tmp/appimagetool --appimage-extract-and-run build/desktop/Orange.AppDir build/desktop/Orange-linux-x64.AppImage || true
             fi
-            tar -C build/desktop -czf build/desktop/Orange-linux-x64.tar.gz Orange.AppDir
+            if [ ! -f build/desktop/Orange-linux-x64.AppImage ]; then
+              tar -C build/desktop -czf build/desktop/Orange-linux-x64.tar.gz Orange.AppDir
+            fi
           fi
         shell: bash
       - uses: actions/upload-artifact@v4
@@ -78,6 +89,6 @@ jobs:
           name: orange-${{ matrix.rid }}
           if-no-files-found: ignore
           path: |
-            build/desktop/Orange-windows-x64.zip
+            build/desktop/win-x64
             build/desktop/Orange-linux-x64.tar.gz
             build/desktop/Orange-linux-x64.AppImage
