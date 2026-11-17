@@ -63,7 +63,7 @@ jobs:
             mkdir -p build/desktop/Orange.AppDir/usr/bin
             cp -a build/desktop/linux-x64/. build/desktop/Orange.AppDir/usr/bin/
             printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/bin/Orange" "$@"\n' > build/desktop/Orange.AppDir/AppRun
-            chmod +x build/desktop/Orange.AppDir/AppRun
+            chmod -R a+rX build/desktop/Orange.AppDir
             cp Configuration/AppIcon.png build/desktop/Orange.AppDir/orange.png
             printf '%s\n' '[Desktop Entry]' 'Name=Orange' 'Exec=Orange' 'Icon=orange' 'Type=Application' 'Categories=Utility;' > build/desktop/Orange.AppDir/orange.desktop
             if curl -fsSL -o /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage; then

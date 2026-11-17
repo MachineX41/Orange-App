@@ -37,7 +37,7 @@ cat > "$dist/Orange.AppDir/AppRun" <<'EOF'
 HERE="$(dirname "$(readlink -f "$0")")"
 exec "$HERE/usr/bin/Orange" "$@"
 EOF
-chmod +x "$dist/Orange.AppDir/AppRun"
+chmod -R a+rX "$dist/Orange.AppDir"
 cp "$root/../Configuration/AppIcon.png" "$dist/Orange.AppDir/orange.png"
 cat > "$dist/Orange.AppDir/orange.desktop" <<'EOF'
 [Desktop Entry]
