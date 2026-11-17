@@ -56,13 +56,13 @@ jobs:
           fi
           find "$RUNNER_TEMP/ff/out" -type f \( -name 'ffmpeg' -o -name 'ffmpeg.exe' \) -exec cp {} "$dest/" \;
           if [ "$rid" = "win-x64" ]; then
-            cat > "$dest/OKU.txt" <<'EOF'
-Orange'ı zip penceresinin içinden çalıştırmayın. Zipin tamamını bir klasöre çıkarın, sonra o klasördeki Orange.exe dosyasına çift tıklayın.
-
-Windows tanımadığı uygulamayı keser. Orange.exe üzerinde sağ tık, Özellikler, altta Engellemeyi kaldır varsa işaretleyin. Tekrar açınca Daha fazla bilgi ve Yine de çalıştır deyin.
-
-Yönetici olarak açmayın. Pencere gelmezse aynı klasördeki startup.log dosyasına bakın.
-EOF
+            {
+              echo 'Orange uygulamasını zip penceresinin içinden çalıştırmayın. Zipin tamamını bir klasöre çıkarın, sonra o klasördeki Orange.exe dosyasına çift tıklayın.'
+              echo
+              echo 'Windows tanımadığı uygulamayı keser. Orange.exe üzerinde sağ tık, Özellikler, altta Engellemeyi kaldır varsa işaretleyin. Tekrar açınca Daha fazla bilgi ve Yine de çalıştır deyin.'
+              echo
+              echo 'Yönetici olarak açmayın. Pencere gelmezse aynı klasördeki startup.log dosyasına bakın.'
+            } > "$dest/OKU.txt"
           fi
       - name: Archive
         run: |
