@@ -67,6 +67,17 @@ public static class DownloadStudio
             WorkingDirectory = directory
         };
         start.ArgumentList.Add("--newline");
+        start.ArgumentList.Add("--retries");
+        start.ArgumentList.Add("10");
+        start.ArgumentList.Add("--fragment-retries");
+        start.ArgumentList.Add("10");
+        start.ArgumentList.Add("--extractor-retries");
+        start.ArgumentList.Add("3");
+        if (IsYouTube(url) && CanImpersonateChrome(tool))
+        {
+            start.ArgumentList.Add("--impersonate");
+            start.ArgumentList.Add("chrome");
+        }
         start.ArgumentList.Add("-o");
         start.ArgumentList.Add("%(title)s.%(ext)s");
         if (audioOnly)
@@ -88,5 +99,44 @@ public static class DownloadStudio
         if (process.ExitCode != 0) throw new OrangeException(OrangeErrorCode.ToolFailed, "yt-dlp");
         var newest = new DirectoryInfo(directory).EnumerateFiles().OrderByDescending(file => file.LastWriteTimeUtc).FirstOrDefault();
         return newest is null ? [] : [newest.FullName];
+    }
+
+    static bool IsYouTube(Uri url)
+    {
+        var host = url.Host.ToLowerInvariant();
+        if (host == "youtu.be" || host.EndsWith(".youtu.be", StringComparison.Ordinal)) return true;
+        if (host == "youtube.com" || host.EndsWith(".youtube.com", StringComparison.Ordinal)) return true;
+        return host == "youtube-nocookie.com" || host.EndsWith(".youtube-nocookie.com", StringComparison.Ordinal);
+    }
+
+    static bool? chromeImpersonation;
+
+    static bool CanImpersonateChrome(string tool)
+    {
+        if (chromeImpersonation is { } cached) return cached;
+        try
+        {
+            var start = new ProcessStartInfo(tool, "--list-impersonate-targets")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(start);
+            if (process is null)
+            {
+                chromeImpersonation = false;
+                return false;
+            }
+            var text = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            chromeImpersonation = text.Contains("chrome", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            chromeImpersonation = false;
+        }
+        return chromeImpersonation == true;
     }
 }

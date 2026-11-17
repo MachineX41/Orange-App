@@ -28,7 +28,11 @@ public enum LinkDownloader {
             return [try await fetch(url, into: directory, progress: progress)]
         }
         if let tool = downloaderPath {
-            return try await runDownloader(tool, url: url, audioOnly: audioOnly, into: directory, progress: progress)
+            var impersonate = false
+            if isYouTube(url) {
+                impersonate = await Task.detached { canImpersonateChrome(tool) }.value
+            }
+            return try await runDownloader(tool, url: url, audioOnly: audioOnly, into: directory, impersonateChrome: impersonate, progress: progress)
         }
         if let media = try await discoverMedia(in: url) {
             return [try await fetch(media, into: directory, progress: progress, rejectPages: true)]
@@ -243,23 +247,110 @@ public enum LinkDownloader {
         }
     }
 
-    static func runDownloader(_ tool: String, url: URL, audioOnly: Bool, into directory: URL, progress: ProgressHandler?) async throws -> [URL] {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: tool)
+    /// YouTube resets Python’s default TLS handshake (`Connection reset by peer` on the
+    /// player API). Chrome impersonation uses curl_cffi and gets through.
+    public static func isYouTube(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        if host == "youtu.be" || host.hasSuffix(".youtu.be") { return true }
+        return ["youtube.com", "youtube-nocookie.com"].contains { host == $0 || host.hasSuffix("." + $0) }
+    }
+
+    public static func downloaderArguments(url: URL, audioOnly: Bool, directory: URL, impersonateChrome: Bool) -> [String] {
         var arguments = [
             "--no-playlist", "--newline", "--progress", "--no-mtime", "--restrict-filenames",
             "--progress-delta", "0.15",
             "--progress-template", "download:ORANGEPROG:%(progress._percent)s",
+            "--retries", "10",
+            "--fragment-retries", "10",
+            "--extractor-retries", "3",
             "-P", directory.path,
             "-o", "%(title).120B.%(ext)s",
             "--print", "after_move:ORANGE:%(filepath)s"
         ]
+        if impersonateChrome, isYouTube(url) {
+            arguments += ["--impersonate", "chrome"]
+        }
         if audioOnly {
             arguments += ["-x", "--audio-format", "m4a"]
         } else {
             arguments += ["-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b", "--merge-output-format", "mp4"]
         }
-        process.arguments = arguments + [url.absoluteString]
+        arguments.append(url.absoluteString)
+        return arguments
+    }
+
+    private static let impersonationLock = NSLock()
+    private static var cachedChromeImpersonation: Bool?
+
+    static func canImpersonateChrome(_ tool: String) -> Bool {
+        impersonationLock.lock()
+        if let cachedChromeImpersonation {
+            impersonationLock.unlock()
+            return cachedChromeImpersonation
+        }
+        impersonationLock.unlock()
+        let available = probeChromeImpersonation(tool)
+        impersonationLock.lock()
+        cachedChromeImpersonation = available
+        impersonationLock.unlock()
+        return available
+    }
+
+    private static func probeChromeImpersonation(_ tool: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tool)
+        process.arguments = ["--list-impersonate-targets"]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+        process.waitUntilExit()
+        let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        return text.range(of: "chrome", options: .caseInsensitive) != nil
+    }
+
+    static func runDownloader(_ tool: String, url: URL, audioOnly: Bool, into directory: URL, impersonateChrome: Bool = false, progress: ProgressHandler?) async throws -> [URL] {
+        var lastError: Error = OrangeError.toolFailed("yt-dlp")
+        for attempt in 1...2 {
+            do {
+                return try await runDownloaderOnce(tool, url: url, audioOnly: audioOnly, into: directory, impersonateChrome: impersonateChrome, progress: progress)
+            } catch OrangeError.cancelled {
+                throw OrangeError.cancelled
+            } catch {
+                lastError = error
+                if attempt == 2 || Task.isCancelled { throw error }
+            }
+        }
+        throw lastError
+    }
+
+    /// `waitUntilExit` after the pipes close never returns on macOS: the process is already
+    /// gone, and the download sits on the last reported percent. The termination handler is
+    /// armed before launch so that exit is observed either way.
+    static func launchAndWait(_ process: Process) async throws {
+        let exit = ProcessExit()
+        process.terminationHandler = { _ in exit.signal() }
+        do {
+            try process.run()
+        } catch {
+            exit.signal()
+            throw error
+        }
+        await withTaskCancellationHandler {
+            await exit.wait()
+        } onCancel: {
+            if process.isRunning { process.terminate() }
+        }
+    }
+
+    private static func runDownloaderOnce(_ tool: String, url: URL, audioOnly: Bool, into directory: URL, impersonateChrome: Bool, progress: ProgressHandler?) async throws -> [URL] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tool)
+        process.arguments = downloaderArguments(url: url, audioOnly: audioOnly, directory: directory, impersonateChrome: impersonateChrome)
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (environment["PATH"] ?? "")
         environment["PYTHONUNBUFFERED"] = "1"
@@ -269,23 +360,13 @@ public enum LinkDownloader {
         process.standardOutput = out
         process.standardError = err
         let collector = OutputCollector(progress: progress)
-        let pipes = DispatchGroup()
-        pipes.enter()
-        pipes.enter()
-        Self.stream(out.fileHandleForReading, group: pipes) { collector.consume($0) }
-        Self.stream(err.fileHandleForReading, group: pipes) { collector.error($0) }
-        try process.run()
-        await withTaskCancellationHandler {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                DispatchQueue.global().async {
-                    pipes.wait()
-                    process.waitUntilExit()
-                    continuation.resume()
-                }
-            }
-        } onCancel: {
-            process.terminate()
-        }
+        let stdout = PipePump { collector.consume($0) }
+        let stderr = PipePump { collector.error($0) }
+        stdout.start(out.fileHandleForReading)
+        stderr.start(err.fileHandleForReading)
+        try await launchAndWait(process)
+        stdout.finish(out.fileHandleForReading)
+        stderr.finish(err.fileHandleForReading)
         if Task.isCancelled { throw OrangeError.cancelled }
         let paths = collector.finish()
         guard process.terminationStatus == 0, !paths.isEmpty else {
@@ -298,32 +379,63 @@ public enum LinkDownloader {
         return paths.map { URL(fileURLWithPath: $0) }
     }
 
-    /// Reads a pipe until it closes, so each progress line is delivered as yt-dlp writes it.
-    private static func stream(_ handle: FileHandle, group: DispatchGroup, receive: @escaping @Sendable (String) -> Void) {
-        let gate = PipeGate()
-        handle.readabilityHandler = { handle in
-            let data = handle.availableData
-            if data.isEmpty {
-                gate.close {
-                    handle.readabilityHandler = nil
-                    group.leave()
+    private final class ProcessExit: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<Void, Never>?
+        private var exited = false
+
+        func signal() {
+            lock.lock()
+            exited = true
+            let continuation = continuation
+            self.continuation = nil
+            lock.unlock()
+            continuation?.resume()
+        }
+
+        func wait() async {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                if exited {
+                    lock.unlock()
+                    continuation.resume()
+                } else {
+                    self.continuation = continuation
+                    lock.unlock()
                 }
-                return
             }
-            receive(String(decoding: data, as: UTF8.self))
         }
     }
 
-    private final class PipeGate: @unchecked Sendable {
-        private let lock = NSLock()
-        private var closed = false
+    /// Reads a pipe until it closes, so each progress line is delivered as yt-dlp writes it.
+    private final class PipePump: @unchecked Sendable {
+        private let queue = DispatchQueue(label: "app.orange.download-pipe")
+        private let receive: @Sendable (String) -> Void
+        private var stopped = false
 
-        func close(_ body: () -> Void) {
-            lock.lock()
-            let first = !closed
-            closed = true
-            lock.unlock()
-            if first { body() }
+        init(_ receive: @escaping @Sendable (String) -> Void) {
+            self.receive = receive
+        }
+
+        func start(_ handle: FileHandle) {
+            handle.readabilityHandler = { [weak self] handle in
+                self?.queue.async { self?.drain(handle, toEnd: false) }
+            }
+        }
+
+        func finish(_ handle: FileHandle) {
+            queue.sync {
+                stopped = true
+                handle.readabilityHandler = nil
+                drain(handle, toEnd: true)
+            }
+        }
+
+        private func drain(_ handle: FileHandle, toEnd: Bool) {
+            if stopped, !toEnd { return }
+            let data = toEnd ? handle.readDataToEndOfFile() : handle.availableData
+            guard !data.isEmpty else { return }
+            receive(String(decoding: data, as: UTF8.self))
         }
     }
 }
